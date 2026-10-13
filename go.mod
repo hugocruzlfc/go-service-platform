@@ -1,3 +1,3 @@
-module github.com/hugocruz/go-service-platform
+module go-service-platform
 
 go 1.27.2

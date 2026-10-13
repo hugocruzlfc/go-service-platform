@@ -1,62 +1,17 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"time"
+
+	"go-service-platform/internal/adapter/httpapi"
 )
 
-type HealthResponse struct {
-	Status string `json:"status"`
-	Time   string `json:"time"`
-}
-
-type VersionResponse struct {
-    Version string `json:"version"`
-}
-
-
-func healthHandler(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Content-Type", "application/json")
-
-    response := HealthResponse{
-        Status: "ok",
-        Time:   time.Now().UTC().Format(time.RFC3339),
-    }
-
-    if err := json.NewEncoder(w).Encode(response); err != nil {
-        log.Printf("encoding health response: %v", err)
-    }
-}
-
-
-
-
-
 func main() {
-	mux := http.NewServeMux()
-
-	//health
-	mux.HandleFunc("GET /health", healthHandler);
-
-    //version
-	mux.HandleFunc("GET /version", func(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Content-Type", "application/json")
-
-    response := VersionResponse{
-        Version: "1.0.0",
-    }
-
-    if err := json.NewEncoder(w).Encode(response); err != nil {
-        log.Printf("encoding version response: %v", err)
-    }
-})
-
-
 	server := &http.Server{
 		Addr:              ":8080",
-		Handler:           mux,
+		Handler:           httpapi.NewRouter(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
