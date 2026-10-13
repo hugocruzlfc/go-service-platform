@@ -12,21 +12,47 @@ type HealthResponse struct {
 	Time   string `json:"time"`
 }
 
+type VersionResponse struct {
+    Version string `json:"version"`
+}
+
+
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+
+    response := HealthResponse{
+        Status: "ok",
+        Time:   time.Now().UTC().Format(time.RFC3339),
+    }
+
+    if err := json.NewEncoder(w).Encode(response); err != nil {
+        log.Printf("encoding health response: %v", err)
+    }
+}
+
+
+
+
+
 func main() {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+	//health
+	mux.HandleFunc("GET /health", healthHandler);
 
-		response := HealthResponse{
-			Status: "ok",
-			Time:   time.Now().UTC().Format(time.RFC3339),
-		}
+    //version
+	mux.HandleFunc("GET /version", func(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
 
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("encoding health response: %v", err)
-		}
-	})
+    response := VersionResponse{
+        Version: "1.0.0",
+    }
+
+    if err := json.NewEncoder(w).Encode(response); err != nil {
+        log.Printf("encoding version response: %v", err)
+    }
+})
+
 
 	server := &http.Server{
 		Addr:              ":8080",
