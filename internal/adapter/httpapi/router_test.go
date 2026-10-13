@@ -5,10 +5,20 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"go-service-platform/internal/task/application"
+	"go-service-platform/internal/task/infrastructure/memory"
 )
 
+func newTestRouter() http.Handler {
+	repository := memory.NewTaskRepository()
+	service := application.NewTaskService(repository)
+
+	return NewRouter(service)
+}
+
 func TestVersionRoute(t *testing.T) {
-	router := NewRouter()
+	router := newTestRouter()
 
 	req := httptest.NewRequest(
 		http.MethodGet,
@@ -44,7 +54,7 @@ func TestVersionRoute(t *testing.T) {
 }
 
 func TestHealthRoute(t *testing.T) {
-	router := NewRouter()
+	router := newTestRouter()
 
 	req := httptest.NewRequest(
 		http.MethodGet,
