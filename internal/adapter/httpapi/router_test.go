@@ -3,6 +3,8 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -22,8 +24,9 @@ func (f fakeDatabasePinger) Ping(context.Context) error {
 func newTestRouter() http.Handler {
 	repository := memory.NewTaskRepository()
 	service := application.NewTaskService(repository)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	return NewRouter(service, fakeDatabasePinger{})
+	return NewRouter(service, fakeDatabasePinger{}, logger)
 }
 
 func TestVersionRoute(t *testing.T) {
@@ -118,7 +121,8 @@ func TestReadinessRoute(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			repository := memory.NewTaskRepository()
 			service := application.NewTaskService(repository)
-			router := NewRouter(service, fakeDatabasePinger{err: test.databaseErr})
+			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+			router := NewRouter(service, fakeDatabasePinger{err: test.databaseErr}, logger)
 
 			req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 			rec := httptest.NewRecorder()

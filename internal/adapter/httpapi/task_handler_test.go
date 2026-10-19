@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -166,7 +168,8 @@ func TestCreateTaskRouteRejectsEmptyTitle(t *testing.T) {
 func TestTaskRoutesHideRepositoryErrors(t *testing.T) {
 	repositoryError := errors.New("database connection failed")
 	service := application.NewTaskService(failingTaskRepository{err: repositoryError})
-	router := NewRouter(service, fakeDatabasePinger{})
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	router := NewRouter(service, fakeDatabasePinger{}, logger)
 
 	t.Run("create", func(t *testing.T) {
 		req := httptest.NewRequest(

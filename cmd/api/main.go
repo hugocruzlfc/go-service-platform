@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,13 +19,15 @@ import (
 )
 
 func main() {
-	if err := run(context.Background()); err != nil {
-		log.Printf("server stopped: %v", err)
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	if err := run(context.Background(), logger); err != nil {
+		logger.Error("server stopped", slog.Any("error", err))
 		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context) error {
+func run(ctx context.Context, logger *slog.Logger) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -45,7 +47,7 @@ func run(ctx context.Context) error {
 
 	repository := postgres.NewTaskRepository(databasePool)
 	service := application.NewTaskService(repository)
-	router := httpapi.NewRouter(service, databasePool)
+	router := httpapi.NewRouter(service, databasePool, logger)
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -59,7 +61,7 @@ func run(ctx context.Context) error {
 	serverErrors := make(chan error, 1)
 
 	go func() {
-		log.Printf("API listening on %s", cfg.HTTPAddr)
+		logger.Info("API listening", slog.String("address", cfg.HTTPAddr))
 		serverErrors <- server.ListenAndServe()
 	}()
 
@@ -78,7 +80,7 @@ func run(ctx context.Context) error {
 
 		return nil
 	case <-stopSignals.Done():
-		log.Println("shutdown signal received")
+		logger.Info("shutdown signal received")
 
 		shutdownContext, cancel := context.WithTimeout(
 			context.WithoutCancel(stopSignals),
@@ -94,7 +96,7 @@ func run(ctx context.Context) error {
 			return fmt.Errorf("serve HTTP after shutdown: %w", err)
 		}
 
-		log.Println("API stopped gracefully")
+		logger.Info("API stopped gracefully")
 		return nil
 	}
 }

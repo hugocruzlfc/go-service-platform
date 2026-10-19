@@ -2,8 +2,7 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -19,27 +18,27 @@ type HealthResponse struct {
 	Time   string `json:"time"`
 }
 
-func healthHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	response := HealthResponse{
-		Status: "ok",
-		Time:   time.Now().UTC().Format(time.RFC3339),
-	}
-
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		log.Printf("encoding health response: %v", err)
+func healthHandler(logger *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(logger, w, http.StatusOK, HealthResponse{
+			Status: "ok",
+			Time:   time.Now().UTC().Format(time.RFC3339),
+		})
 	}
 }
 
-func readinessHandler(pinger DatabasePinger) http.HandlerFunc {
+func readinessHandler(
+	pinger DatabasePinger,
+	logger *slog.Logger,
+) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := pinger.Ping(r.Context()); err != nil {
-			writeError(w, http.StatusServiceUnavailable, "NOT_READY", "service is not ready")
+			logger.Warn("readiness check failed", slog.Any("error", err))
+			writeError(logger, w, http.StatusServiceUnavailable, "NOT_READY", "service is not ready")
 			return
 		}
 
-		writeJSON(w, http.StatusOK, HealthResponse{
+		writeJSON(logger, w, http.StatusOK, HealthResponse{
 			Status: "ready",
 			Time:   time.Now().UTC().Format(time.RFC3339),
 		})

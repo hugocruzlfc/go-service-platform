@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"service-platform/internal/task/application"
@@ -13,11 +13,16 @@ import (
 
 type taskHandler struct {
 	service *application.TaskService
+	logger  *slog.Logger
 }
 
-func newTaskHandler(service *application.TaskService) *taskHandler {
+func newTaskHandler(
+	service *application.TaskService,
+	logger *slog.Logger,
+) *taskHandler {
 	return &taskHandler{
 		service: service,
+		logger:  logger,
 	}
 }
 
@@ -46,12 +51,12 @@ func (h *taskHandler) createTask(
 	decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(&request); err != nil {
-		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "invalid request body")
+		writeError(h.logger, w, http.StatusBadRequest, "INVALID_REQUEST", "invalid request body")
 		return
 	}
 
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "invalid request body")
+		writeError(h.logger, w, http.StatusBadRequest, "INVALID_REQUEST", "invalid request body")
 		return
 	}
 
@@ -60,17 +65,17 @@ func (h *taskHandler) createTask(
 		if errors.Is(err, domain.ErrTaskIDRequired) ||
 			errors.Is(err, domain.ErrTaskTitleRequired) ||
 			errors.Is(err, domain.ErrTaskTitleTooLong) {
-			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", validationErrorMessage(err))
+			writeError(h.logger, w, http.StatusBadRequest, "VALIDATION_ERROR", validationErrorMessage(err))
 			return
 		}
 
-		log.Printf("creating task: %v", err)
+		h.logger.Error("creating task", slog.Any("error", err))
 
-		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		writeError(h.logger, w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, task)
+	writeJSON(h.logger, w, http.StatusCreated, task)
 }
 
 func (h *taskHandler) listTasks(
@@ -79,13 +84,13 @@ func (h *taskHandler) listTasks(
 ) {
 	tasks, err := h.service.ListTasks(r.Context())
 	if err != nil {
-		log.Printf("listing tasks: %v", err)
+		h.logger.Error("listing tasks", slog.Any("error", err))
 
-		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		writeError(h.logger, w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, tasks)
+	writeJSON(h.logger, w, http.StatusOK, tasks)
 }
 
 func validationErrorMessage(err error) string {
@@ -101,8 +106,8 @@ func validationErrorMessage(err error) string {
 	}
 }
 
-func writeError(w http.ResponseWriter, status int, code, message string) {
-	writeJSON(w, status, errorResponse{
+func writeError(logger *slog.Logger, w http.ResponseWriter, status int, code, message string) {
+	writeJSON(logger, w, status, errorResponse{
 		Error: errorDetail{
 			Code:    code,
 			Message: message,
@@ -110,11 +115,11 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 	})
 }
 
-func writeJSON(w http.ResponseWriter, status int, data any) {
+func writeJSON(logger *slog.Logger, w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 
 	if err := json.NewEncoder(w).Encode(data); err != nil {
-		log.Printf("encoding JSON response: %v", err)
+		logger.Error("encoding JSON response", slog.Any("error", err))
 	}
 }

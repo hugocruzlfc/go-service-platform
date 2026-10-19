@@ -1,8 +1,7 @@
 package httpapi
 
 import (
-	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 )
 
@@ -11,14 +10,10 @@ type VersionResponse struct {
 	Version string `json:"version"`
 }
 
-func versionHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	response := VersionResponse{
-		Version: "1.0.0",
-	}
-
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		log.Printf("encoding version response: %v", err)
+func versionHandler(logger *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(logger, w, http.StatusOK, VersionResponse{
+			Version: "1.0.0",
+		})
 	}
 }

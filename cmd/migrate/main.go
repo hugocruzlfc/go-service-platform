@@ -4,7 +4,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 
@@ -14,13 +14,15 @@ import (
 )
 
 func main() {
-	if err := run(context.Background()); err != nil {
-		log.Printf("migration failed: %v", err)
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	if err := run(context.Background(), logger); err != nil {
+		logger.Error("migration failed", slog.Any("error", err))
 		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context) error {
+func run(ctx context.Context, logger *slog.Logger) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -39,6 +41,6 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("run migrations: %w", err)
 	}
 
-	log.Println("database migrations completed")
+	logger.Info("database migrations completed")
 	return nil
 }
