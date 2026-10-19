@@ -12,6 +12,7 @@ import (
 
 	"service-platform/internal/adapter/httpapi"
 	"service-platform/internal/config"
+	"service-platform/internal/migration"
 	"service-platform/internal/task/application"
 	"service-platform/internal/task/infrastructure/postgres"
 
@@ -37,6 +38,10 @@ func main() {
 	defer databasePool.Close()
 
 	if err := databasePool.Ping(databaseContext); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := migration.Run(databaseContext, databasePool); err != nil {
 		log.Fatal(err)
 	}
 
