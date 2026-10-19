@@ -1,0 +1,185 @@
+package httpapi
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"service-platform/internal/task/application"
+	"service-platform/internal/task/domain"
+)
+
+type failingTaskRepository struct {
+	err error
+}
+
+func (r failingTaskRepository) Create(
+	ctx context.Context,
+	task domain.Task,
+) error {
+	return r.err
+}
+
+func (r failingTaskRepository) List(
+	ctx context.Context,
+) ([]domain.Task, error) {
+	return nil, r.err
+}
+
+func TestCreateTaskRoute(t *testing.T) {
+	router := newTestRouter()
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/tasks",
+		bytes.NewBufferString(`{"title":"  Learn Go  "}`),
+	)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d", http.StatusCreated, rec.Code)
+	}
+
+	var task domain.Task
+
+	if err := json.NewDecoder(rec.Body).Decode(&task); err != nil {
+		t.Fatalf("decoding response: %v", err)
+	}
+
+	if task.ID == "" {
+		t.Error("expected the created task to have an ID")
+	}
+
+	if task.Title != "Learn Go" {
+		t.Errorf("expected title %q, got %q", "Learn Go", task.Title)
+	}
+
+	if task.Completed {
+		t.Error("expected a new task to be incomplete")
+	}
+}
+
+func TestListTasksRoute(t *testing.T) {
+	router := newTestRouter()
+
+	createRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/tasks",
+		bytes.NewBufferString(`{"title":"Learn Go"}`),
+	)
+	createRecorder := httptest.NewRecorder()
+	router.ServeHTTP(createRecorder, createRequest)
+
+	if createRecorder.Code != http.StatusCreated {
+		t.Fatalf("creating task: expected status %d, got %d", http.StatusCreated, createRecorder.Code)
+	}
+
+	listRequest := httptest.NewRequest(http.MethodGet, "/tasks", nil)
+	listRecorder := httptest.NewRecorder()
+	router.ServeHTTP(listRecorder, listRequest)
+
+	if listRecorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, listRecorder.Code)
+	}
+
+	var tasks []domain.Task
+
+	if err := json.NewDecoder(listRecorder.Body).Decode(&tasks); err != nil {
+		t.Fatalf("decoding response: %v", err)
+	}
+
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+
+	if tasks[0].Title != "Learn Go" {
+		t.Errorf("expected title %q, got %q", "Learn Go", tasks[0].Title)
+	}
+}
+
+func TestCreateTaskRouteRejectsInvalidJSON(t *testing.T) {
+	router := newTestRouter()
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/tasks",
+		bytes.NewBufferString(`{"title":`),
+	)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid request body")
+}
+
+func TestCreateTaskRouteRejectsEmptyTitle(t *testing.T) {
+	router := newTestRouter()
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/tasks",
+		bytes.NewBufferString(`{"title":"   "}`),
+	)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "task title is required")
+}
+
+func TestTaskRoutesHideRepositoryErrors(t *testing.T) {
+	repositoryError := errors.New("database connection failed")
+	service := application.NewTaskService(failingTaskRepository{err: repositoryError})
+	router := NewRouter(service)
+
+	t.Run("create", func(t *testing.T) {
+		req := httptest.NewRequest(
+			http.MethodPost,
+			"/tasks",
+			bytes.NewBufferString(`{"title":"Learn Go"}`),
+		)
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		assertErrorResponse(t, rec, http.StatusInternalServerError, "internal server error")
+	})
+
+	t.Run("list", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/tasks", nil)
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		assertErrorResponse(t, rec, http.StatusInternalServerError, "internal server error")
+	})
+}
+
+func assertErrorResponse(
+	t *testing.T,
+	rec *httptest.ResponseRecorder,
+	expectedStatus int,
+	expectedMessage string,
+) {
+	t.Helper()
+
+	if rec.Code != expectedStatus {
+		t.Fatalf("expected status %d, got %d", expectedStatus, rec.Code)
+	}
+
+	var response errorResponse
+
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("decoding error response: %v", err)
+	}
+
+	if response.Error != expectedMessage {
+		t.Errorf("expected error %q, got %q", expectedMessage, response.Error)
+	}
+}
