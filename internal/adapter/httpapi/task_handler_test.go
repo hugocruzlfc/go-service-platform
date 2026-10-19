@@ -118,6 +118,21 @@ func TestCreateTaskRouteRejectsInvalidJSON(t *testing.T) {
 	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid request body")
 }
 
+func TestCreateTaskRouteRejectsTrailingJSON(t *testing.T) {
+	router := newTestRouter()
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/tasks",
+		bytes.NewBufferString(`{"title":"Learn Go"}{"extra":"data"}`),
+	)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid request body")
+}
+
 func TestCreateTaskRouteRejectsEmptyTitle(t *testing.T) {
 	router := newTestRouter()
 

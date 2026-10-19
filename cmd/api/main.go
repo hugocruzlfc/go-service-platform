@@ -6,22 +6,28 @@ import (
 	"time"
 
 	"service-platform/internal/adapter/httpapi"
+	"service-platform/internal/config"
 	"service-platform/internal/task/application"
 	"service-platform/internal/task/infrastructure/memory"
 )
 
 func main() {
+	config, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	repository := memory.NewTaskRepository()
 	service := application.NewTaskService(repository)
 	router := httpapi.NewRouter(service)
 
 	server := &http.Server{
-		Addr:              ":8080",
+		Addr:              config.HTTPAddr,
 		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	log.Println("API listening on :8080")
+	log.Printf("API listening on %s", config.HTTPAddr)
 
 	if err := server.ListenAndServe(); err != nil &&
 		err != http.ErrServerClosed {

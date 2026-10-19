@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 
@@ -38,6 +39,13 @@ func (h *taskHandler) createTask(
 	decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(&request); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse{
+			Error: "invalid request body",
+		})
+		return
+	}
+
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
 		writeJSON(w, http.StatusBadRequest, errorResponse{
 			Error: "invalid request body",
 		})
