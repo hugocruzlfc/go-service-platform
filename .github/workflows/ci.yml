@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check formatting
+        run: make fmt
+
+      - name: Build
+        run: make build
+
+      - name: Vet
+        run: make vet
+
+      - name: Test with race detector
+        run: make test-race
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.6
+
+  vulnerability:
+    name: Vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Scan dependencies
+        run: make vuln
+
+  integration:
+    name: PostgreSQL integration tests
+    runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgres://service_platform:service_platform_dev@localhost:5432/service_platform?sslmode=disable
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Start PostgreSQL
+        run: docker compose up -d postgres
+
+      - name: Wait for PostgreSQL
+        run: |
+          ready=0
+          for attempt in {1..30}; do
+            if docker compose exec -T postgres pg_isready -U service_platform -d service_platform; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          docker compose ps
+          test "$ready" -eq 1
+
+      - name: Run migrations
+        run: go run ./cmd/migrate
+
+      - name: Run integration tests
+        run: make integration
+
+      - name: Stop PostgreSQL
+        if: always()
+        run: docker compose down -v

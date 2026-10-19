@@ -7,6 +7,94 @@ Backend service platform built incrementally with Go.
 - Go 1.27.2
 - Docker with Docker Compose
 
+## Go module and dependency commands
+
+This project uses Go Modules. The module definition is stored in `go.mod`,
+while `go.sum` stores checksums for downloaded modules. Commit both files.
+
+### Clone and initialize the repository
+
+```bash
+git clone <repository-url>
+cd service-platform
+go version
+go mod download
+```
+
+`go mod download` downloads the modules declared by `go.mod`. The Go toolchain
+also downloads missing modules automatically when running commands such as
+`go build`, `go test`, or `go run`.
+
+### Add an application dependency
+
+```bash
+go get github.com/example/library@v1.2.3
+go mod tidy
+```
+
+Import the package from its module path in Go code, then run `go mod tidy` to
+remove unused modules and add any required modules discovered from imports.
+Avoid editing `go.mod` or `go.sum` manually.
+
+### Update an existing dependency
+
+```bash
+go get github.com/example/library@v1.3.0
+go mod tidy
+```
+
+Review the resulting `go.mod`, `go.sum`, and test results before committing.
+
+### Install or run Go tools
+
+Project tools should be registered in `go.mod` when possible. This repository
+registers `govulncheck` as a tool dependency:
+
+```bash
+go get -tool golang.org/x/vuln/cmd/govulncheck@v1.9.0
+go tool govulncheck ./...
+```
+
+For a standalone executable that is not managed by this repository:
+
+```bash
+go install github.com/example/tool/cmd/tool@v1.2.3
+```
+
+`go install` installs a binary for the local developer. `go get` changes the
+project module requirements, while `go get -tool` records a project tool.
+
+### Useful module inspection commands
+
+```bash
+go list -m all
+go list -m -u all
+go mod graph
+go mod why -m github.com/example/library
+go mod tidy
+```
+
+- `go list -m all` lists the module dependency graph.
+- `go list -m -u all` shows available updates.
+- `go mod graph` prints module relationships.
+- `go mod why -m` explains why a module is required.
+- `go mod tidy` synchronizes `go.mod` and `go.sum` with the source code.
+
+### Useful local development commands
+
+```bash
+gofmt -w .
+go build ./...
+go test ./...
+go test -race ./...
+go vet ./...
+go run ./cmd/api
+go run ./cmd/migrate
+```
+
+The project `Makefile` provides equivalent grouped commands. Run `make ci` to
+execute the local checks used by GitHub Actions.
+
 ## Development workflow
 
 ### 1. Start PostgreSQL
@@ -115,6 +203,30 @@ The PostgreSQL integration tests are opt-in and require the Docker database to b
 TEST_DATABASE_URL='postgres://service_platform:service_platform_dev@localhost:5432/service_platform?sslmode=disable' \
   go test -tags=integration -count=1 ./...
 ```
+
+### 6. Run the CI checks locally
+
+The `Makefile` mirrors the checks executed by GitHub Actions:
+
+```bash
+make ci
+```
+
+Individual checks are also available:
+
+```bash
+make fmt
+make build
+make vet
+make test-race
+make lint
+make vuln
+make integration
+```
+
+`make lint` requires `golangci-lint`, and `make vuln` requires the pinned
+`govulncheck` Go tool. The integration target requires PostgreSQL and the
+`TEST_DATABASE_URL` environment variable.
 
 ## Database migrations
 
