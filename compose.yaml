@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: service-platform-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: service_platform
+      POSTGRES_USER: service_platform
+      POSTGRES_PASSWORD: service_platform_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U service_platform -d service_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
