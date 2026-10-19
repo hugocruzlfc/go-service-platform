@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"go-service-platform/internal/task/application"
-	"go-service-platform/internal/task/infrastructure/memory"
+	"service-platform/internal/task/application"
+	"service-platform/internal/task/infrastructure/memory"
 )
 
 func newTestRouter() http.Handler {

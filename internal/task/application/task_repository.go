@@ -3,7 +3,7 @@ package application
 import (
 	"context"
 
-	"go-service-platform/internal/task/domain"
+	"service-platform/internal/task/domain"
 )
 
 type TaskRepository interface {

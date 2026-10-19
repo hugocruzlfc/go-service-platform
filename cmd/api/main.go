@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"go-service-platform/internal/adapter/httpapi"
-	"go-service-platform/internal/task/application"
-	"go-service-platform/internal/task/infrastructure/memory"
+	"service-platform/internal/adapter/httpapi"
+	"service-platform/internal/task/application"
+	"service-platform/internal/task/infrastructure/memory"
 )
 
 func main() {

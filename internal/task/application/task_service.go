@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"go-service-platform/internal/task/domain"
+	"service-platform/internal/task/domain"
 )
 
 type TaskService struct {

@@ -6,7 +6,7 @@ import (
 	"sort"
 	"sync"
 
-	"go-service-platform/internal/task/domain"
+	"service-platform/internal/task/domain"
 )
 
 var ErrTaskAlreadyExists = errors.New("task already exists")

@@ -3,7 +3,7 @@ package httpapi
 import (
 	"net/http"
 
-	"go-service-platform/internal/task/application"
+	"service-platform/internal/task/application"
 )
 
 func NewRouter(service *application.TaskService) http.Handler {

@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 
-	"go-service-platform/internal/task/application"
-	"go-service-platform/internal/task/domain"
+	"service-platform/internal/task/application"
+	"service-platform/internal/task/domain"
 )
 
 type taskHandler struct {

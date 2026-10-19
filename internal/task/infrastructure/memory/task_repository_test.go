@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"go-service-platform/internal/task/domain"
+	"service-platform/internal/task/domain"
 )
 
 func TestTaskRepositoryCreateAndList(t *testing.T) {
