@@ -166,7 +166,7 @@ func TestCreateTaskRouteRejectsEmptyTitle(t *testing.T) {
 func TestTaskRoutesHideRepositoryErrors(t *testing.T) {
 	repositoryError := errors.New("database connection failed")
 	service := application.NewTaskService(failingTaskRepository{err: repositoryError})
-	router := NewRouter(service)
+	router := NewRouter(service, fakeDatabasePinger{})
 
 	t.Run("create", func(t *testing.T) {
 		req := httptest.NewRequest(

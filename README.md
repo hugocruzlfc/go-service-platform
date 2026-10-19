@@ -73,9 +73,16 @@ In another terminal:
 
 ```bash
 curl --fail --silent http://localhost:8080/health
+curl --fail --silent http://localhost:8080/healthz
+curl --fail --silent http://localhost:8080/readyz
 curl --fail --silent http://localhost:8080/version
 curl --fail --silent http://localhost:8080/tasks
 ```
+
+`/health` and `/healthz` are liveness checks. They confirm that the process is
+running and do not depend on PostgreSQL. `/readyz` is a readiness check: it
+returns `200` when PostgreSQL is reachable and `503` when the service should
+not receive traffic.
 
 Create a task:
 

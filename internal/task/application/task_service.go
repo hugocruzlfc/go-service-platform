@@ -10,16 +10,19 @@ import (
 	"service-platform/internal/task/domain"
 )
 
+// TaskService implements task use cases.
 type TaskService struct {
 	repository TaskRepository
 }
 
+// NewTaskService creates a task service using repository as its persistence dependency.
 func NewTaskService(repository TaskRepository) *TaskService {
 	return &TaskService{
 		repository: repository,
 	}
 }
 
+// CreateTask validates and persists a new task with a generated ID.
 func (s *TaskService) CreateTask(
 	ctx context.Context,
 	title string,
@@ -41,6 +44,7 @@ func (s *TaskService) CreateTask(
 	return task, nil
 }
 
+// ListTasks returns all tasks from the configured repository.
 func (s *TaskService) ListTasks(
 	ctx context.Context,
 ) ([]domain.Task, error) {

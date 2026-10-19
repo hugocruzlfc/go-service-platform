@@ -12,10 +12,12 @@ import (
 
 var _ application.TaskRepository = (*TaskRepository)(nil)
 
+// TaskRepository persists tasks in PostgreSQL.
 type TaskRepository struct {
 	pool *pgxpool.Pool
 }
 
+// NewTaskRepository creates a PostgreSQL task repository using pool.
 func NewTaskRepository(pool *pgxpool.Pool) *TaskRepository {
 	return &TaskRepository{
 		pool: pool,

@@ -1,3 +1,4 @@
+// Command api starts the task HTTP API.
 package main
 
 import (
@@ -44,7 +45,7 @@ func run(ctx context.Context) error {
 
 	repository := postgres.NewTaskRepository(databasePool)
 	service := application.NewTaskService(repository)
-	router := httpapi.NewRouter(service)
+	router := httpapi.NewRouter(service, databasePool)
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,

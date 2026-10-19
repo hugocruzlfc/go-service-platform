@@ -7,11 +7,13 @@ import (
 )
 
 var (
+	// Task validation errors.
 	ErrTaskIDRequired    = errors.New("task ID is required")
 	ErrTaskTitleRequired = errors.New("task title is required")
 	ErrTaskTitleTooLong  = errors.New("task title must not exceed 120 characters")
 )
 
+// Task represents a task managed by the service.
 type Task struct {
 	ID        string    `json:"id"`
 	Title     string    `json:"title"`
@@ -19,6 +21,7 @@ type Task struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
+// NewTask creates a validated incomplete task and normalizes its timestamp to UTC.
 func NewTask(id, title string, createdAt time.Time) (Task, error) {
 	id = strings.TrimSpace(id)
 	title = strings.TrimSpace(title)

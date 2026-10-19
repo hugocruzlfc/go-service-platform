@@ -8,14 +8,18 @@ import (
 	"strconv"
 )
 
-const defaultPort = 8080
-const defaultDatabaseURL = "postgres://service_platform:service_platform_dev@localhost:5432/service_platform?sslmode=disable"
+const (
+	defaultPort        = 8080
+	defaultDatabaseURL = "postgres://service_platform:service_platform_dev@localhost:5432/service_platform?sslmode=disable"
+)
 
+// Config contains validated application configuration.
 type Config struct {
 	HTTPAddr    string
 	DatabaseURL string
 }
 
+// Load reads application configuration from environment variables.
 func Load() (Config, error) {
 	port := defaultPort
 

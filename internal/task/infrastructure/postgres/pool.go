@@ -16,6 +16,7 @@ const (
 	defaultHealthCheckPeriod = 1 * time.Minute
 )
 
+// NewPool creates a configured PostgreSQL connection pool and verifies connectivity.
 func NewPool(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 	poolConfig, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {

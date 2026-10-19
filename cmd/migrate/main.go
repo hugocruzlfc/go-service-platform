@@ -1,3 +1,4 @@
+// Command migrate applies pending database migrations.
 package main
 
 import (

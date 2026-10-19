@@ -19,6 +19,7 @@ const createMigrationsTable = `
 	)
 `
 
+// Run applies all embedded migrations that are not recorded as applied.
 func Run(ctx context.Context, pool *pgxpool.Pool) error {
 	if _, err := pool.Exec(ctx, createMigrationsTable); err != nil {
 		return fmt.Errorf("create migrations table: %w", err)

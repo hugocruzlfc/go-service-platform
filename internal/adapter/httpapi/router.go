@@ -6,12 +6,18 @@ import (
 	"service-platform/internal/task/application"
 )
 
-func NewRouter(service *application.TaskService) http.Handler {
+// NewRouter creates the HTTP handler tree for the task API.
+func NewRouter(
+	service *application.TaskService,
+	databasePinger DatabasePinger,
+) http.Handler {
 	mux := http.NewServeMux()
 
 	tasks := newTaskHandler(service)
 
 	mux.HandleFunc("GET /health", healthHandler)
+	mux.HandleFunc("GET /healthz", healthHandler)
+	mux.Handle("GET /readyz", readinessHandler(databasePinger))
 	mux.HandleFunc("GET /version", versionHandler)
 	mux.HandleFunc("POST /tasks", tasks.createTask)
 	mux.HandleFunc("GET /tasks", tasks.listTasks)

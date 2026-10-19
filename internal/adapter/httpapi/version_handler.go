@@ -6,6 +6,7 @@ import (
 	"net/http"
 )
 
+// VersionResponse is the response returned by the version endpoint.
 type VersionResponse struct {
 	Version string `json:"version"`
 }

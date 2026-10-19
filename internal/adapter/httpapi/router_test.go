@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,11 +11,19 @@ import (
 	"service-platform/internal/task/infrastructure/memory"
 )
 
+type fakeDatabasePinger struct {
+	err error
+}
+
+func (f fakeDatabasePinger) Ping(context.Context) error {
+	return f.err
+}
+
 func newTestRouter() http.Handler {
 	repository := memory.NewTaskRepository()
 	service := application.NewTaskService(repository)
 
-	return NewRouter(service)
+	return NewRouter(service, fakeDatabasePinger{})
 }
 
 func TestVersionRoute(t *testing.T) {
@@ -72,5 +81,57 @@ func TestHealthRoute(t *testing.T) {
 			http.StatusOK,
 			rec.Code,
 		)
+	}
+}
+
+func TestLivenessRoute(t *testing.T) {
+	router := newTestRouter()
+
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+}
+
+func TestReadinessRoute(t *testing.T) {
+	tests := []struct {
+		name           string
+		databaseErr    error
+		expectedStatus int
+	}{
+		{
+			name:           "database is available",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "database is unavailable",
+			databaseErr:    context.Canceled,
+			expectedStatus: http.StatusServiceUnavailable,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			repository := memory.NewTaskRepository()
+			service := application.NewTaskService(repository)
+			router := NewRouter(service, fakeDatabasePinger{err: test.databaseErr})
+
+			req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+			rec := httptest.NewRecorder()
+
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != test.expectedStatus {
+				t.Fatalf(
+					"expected status %d, got %d",
+					test.expectedStatus,
+					rec.Code,
+				)
+			}
+		})
 	}
 }

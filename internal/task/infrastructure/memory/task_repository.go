@@ -9,13 +9,16 @@ import (
 	"service-platform/internal/task/domain"
 )
 
+// ErrTaskAlreadyExists indicates that a task ID is already stored.
 var ErrTaskAlreadyExists = errors.New("task already exists")
 
+// TaskRepository stores tasks in memory and is safe for concurrent use.
 type TaskRepository struct {
 	mu    sync.RWMutex
 	tasks map[string]domain.Task
 }
 
+// NewTaskRepository creates an empty in-memory task repository.
 func NewTaskRepository() *TaskRepository {
 	return &TaskRepository{
 		tasks: make(map[string]domain.Task),
