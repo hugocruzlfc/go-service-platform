@@ -1,7 +1,9 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 )
@@ -35,8 +37,25 @@ func Load() (Config, error) {
 		databaseURL = defaultDatabaseURL
 	}
 
+	if err := validateDatabaseURL(databaseURL); err != nil {
+		return Config{}, err
+	}
+
 	return Config{
 		HTTPAddr:    fmt.Sprintf(":%d", port),
 		DatabaseURL: databaseURL,
 	}, nil
+}
+
+func validateDatabaseURL(databaseURL string) error {
+	parsedURL, err := url.Parse(databaseURL)
+	if err != nil || parsedURL.Host == "" {
+		return errors.New("DATABASE_URL must be a valid PostgreSQL URL")
+	}
+
+	if parsedURL.Scheme != "postgres" && parsedURL.Scheme != "postgresql" {
+		return errors.New("DATABASE_URL must use the postgres or postgresql scheme")
+	}
+
+	return nil
 }

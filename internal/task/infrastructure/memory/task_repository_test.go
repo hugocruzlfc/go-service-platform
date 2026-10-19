@@ -11,7 +11,7 @@ import (
 
 func TestTaskRepositoryCreateAndList(t *testing.T) {
 	repository := NewTaskRepository()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	first, err := domain.NewTask(
 		"task-2",
@@ -55,7 +55,7 @@ func TestTaskRepositoryCreateAndList(t *testing.T) {
 
 func TestTaskRepositoryRejectsDuplicateID(t *testing.T) {
 	repository := NewTaskRepository()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	task, err := domain.NewTask("task-1", "Learn Go", time.Now())
 	if err != nil {

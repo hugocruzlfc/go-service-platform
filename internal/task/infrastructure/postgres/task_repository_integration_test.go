@@ -1,3 +1,5 @@
+//go:build integration
+
 package postgres
 
 import (
@@ -5,8 +7,6 @@ import (
 	"os"
 	"testing"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"service-platform/internal/task/domain"
 )
@@ -17,15 +17,12 @@ func TestTaskRepositoryCreateAndListIntegration(t *testing.T) {
 		t.Skip("set TEST_DATABASE_URL to run the PostgreSQL integration test")
 	}
 
-	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, databaseURL)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	t.Cleanup(cancel)
+
+	pool, err := NewPool(ctx, databaseURL)
 	if err != nil {
 		t.Fatalf("creating database pool: %v", err)
-	}
-
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
-		t.Fatalf("connecting to database: %v", err)
 	}
 
 	repository := NewTaskRepository(pool)
@@ -39,7 +36,13 @@ func TestTaskRepositoryCreateAndListIntegration(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		_, cleanupErr := pool.Exec(ctx, "DELETE FROM tasks WHERE id = $1", task.ID)
+		cleanupContext, cancelCleanup := context.WithTimeout(
+			context.Background(),
+			5*time.Second,
+		)
+		defer cancelCleanup()
+
+		_, cleanupErr := pool.Exec(cleanupContext, "DELETE FROM tasks WHERE id = $1", task.ID)
 		if cleanupErr != nil {
 			t.Errorf("cleaning up integration task: %v", cleanupErr)
 		}

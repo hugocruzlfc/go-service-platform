@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -12,58 +13,57 @@ import (
 
 	"service-platform/internal/adapter/httpapi"
 	"service-platform/internal/config"
-	"service-platform/internal/migration"
 	"service-platform/internal/task/application"
 	"service-platform/internal/task/infrastructure/postgres"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
-	config, err := config.Load()
+	if err := run(context.Background()); err != nil {
+		log.Printf("server stopped: %v", err)
+		os.Exit(1)
+	}
+}
+
+func run(ctx context.Context) error {
+	cfg, err := config.Load()
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("load config: %w", err)
 	}
 
 	databaseContext, cancelDatabase := context.WithTimeout(
-		context.Background(),
+		ctx,
 		5*time.Second,
 	)
 	defer cancelDatabase()
 
-	databasePool, err := pgxpool.New(databaseContext, config.DatabaseURL)
+	databasePool, err := postgres.NewPool(databaseContext, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer databasePool.Close()
-
-	if err := databasePool.Ping(databaseContext); err != nil {
-		log.Fatal(err)
-	}
-
-	if err := migration.Run(databaseContext, databasePool); err != nil {
-		log.Fatal(err)
-	}
 
 	repository := postgres.NewTaskRepository(databasePool)
 	service := application.NewTaskService(repository)
 	router := httpapi.NewRouter(service)
 
 	server := &http.Server{
-		Addr:              config.HTTPAddr,
+		Addr:              cfg.HTTPAddr,
 		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	serverErrors := make(chan error, 1)
 
 	go func() {
-		log.Printf("API listening on %s", config.HTTPAddr)
+		log.Printf("API listening on %s", cfg.HTTPAddr)
 		serverErrors <- server.ListenAndServe()
 	}()
 
 	stopSignals, stop := signal.NotifyContext(
-		context.Background(),
+		ctx,
 		os.Interrupt,
 		syscall.SIGTERM,
 	)
@@ -72,21 +72,28 @@ func main() {
 	select {
 	case err := <-serverErrors:
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatal(err)
+			return fmt.Errorf("serve HTTP: %w", err)
 		}
+
+		return nil
 	case <-stopSignals.Done():
 		log.Println("shutdown signal received")
 
 		shutdownContext, cancel := context.WithTimeout(
-			context.Background(),
+			context.WithoutCancel(stopSignals),
 			5*time.Second,
 		)
 		defer cancel()
 
 		if err := server.Shutdown(shutdownContext); err != nil {
-			log.Fatal(err)
+			return fmt.Errorf("shutdown HTTP server: %w", err)
+		}
+
+		if err := <-serverErrors; err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("serve HTTP after shutdown: %w", err)
 		}
 
 		log.Println("API stopped gracefully")
+		return nil
 	}
 }

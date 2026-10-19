@@ -59,3 +59,24 @@ func TestLoadRejectsInvalidPort(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadRejectsInvalidDatabaseURL(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+	}{
+		{name: "missing host", url: "postgres://"},
+		{name: "unsupported scheme", url: "mysql://user:password@localhost/database"},
+		{name: "malformed URL", url: "postgres://%zz"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("DATABASE_URL", test.url)
+
+			if _, err := Load(); err == nil {
+				t.Fatalf("expected an error for DATABASE_URL=%q", test.url)
+			}
+		})
+	}
+}

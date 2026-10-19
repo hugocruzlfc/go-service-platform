@@ -47,7 +47,7 @@ func (r *fakeTaskRepository) List(
 func TestTaskServiceCreateTask(t *testing.T) {
 	repository := &fakeTaskRepository{}
 	service := NewTaskService(repository)
-	ctx := context.WithValue(context.Background(), "request-id", "request-1")
+	ctx := t.Context()
 
 	task, err := service.CreateTask(ctx, "  Learn Go  ")
 
@@ -90,7 +90,7 @@ func TestTaskServiceListTasks(t *testing.T) {
 	}
 	repository := &fakeTaskRepository{listedTasks: expectedTasks}
 	service := NewTaskService(repository)
-	ctx := context.WithValue(context.Background(), "request-id", "request-1")
+	ctx := t.Context()
 
 	tasks, err := service.ListTasks(ctx)
 
@@ -115,7 +115,7 @@ func TestTaskServiceCreateTaskWrapsRepositoryError(t *testing.T) {
 	repositoryError := errors.New("repository unavailable")
 	service := NewTaskService(&fakeTaskRepository{createErr: repositoryError})
 
-	_, err := service.CreateTask(context.Background(), "Learn Go")
+	_, err := service.CreateTask(t.Context(), "Learn Go")
 
 	if !errors.Is(err, repositoryError) {
 		t.Errorf("expected wrapped repository error, got %v", err)
@@ -130,7 +130,7 @@ func TestTaskServiceListTasksWrapsRepositoryError(t *testing.T) {
 	repositoryError := errors.New("repository unavailable")
 	service := NewTaskService(&fakeTaskRepository{listErr: repositoryError})
 
-	_, err := service.ListTasks(context.Background())
+	_, err := service.ListTasks(t.Context())
 
 	if !errors.Is(err, repositoryError) {
 		t.Errorf("expected wrapped repository error, got %v", err)

@@ -115,7 +115,7 @@ func TestCreateTaskRouteRejectsInvalidJSON(t *testing.T) {
 
 	router.ServeHTTP(rec, req)
 
-	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid request body")
+	assertErrorResponse(t, rec, http.StatusBadRequest, "INVALID_REQUEST", "invalid request body")
 }
 
 func TestCreateTaskRouteRejectsTrailingJSON(t *testing.T) {
@@ -130,7 +130,22 @@ func TestCreateTaskRouteRejectsTrailingJSON(t *testing.T) {
 
 	router.ServeHTTP(rec, req)
 
-	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid request body")
+	assertErrorResponse(t, rec, http.StatusBadRequest, "INVALID_REQUEST", "invalid request body")
+}
+
+func TestCreateTaskRouteRejectsOversizedBody(t *testing.T) {
+	router := newTestRouter()
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/tasks",
+		bytes.NewReader(bytes.Repeat([]byte("a"), 1<<20+1)),
+	)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "INVALID_REQUEST", "invalid request body")
 }
 
 func TestCreateTaskRouteRejectsEmptyTitle(t *testing.T) {
@@ -145,7 +160,7 @@ func TestCreateTaskRouteRejectsEmptyTitle(t *testing.T) {
 
 	router.ServeHTTP(rec, req)
 
-	assertErrorResponse(t, rec, http.StatusBadRequest, "task title is required")
+	assertErrorResponse(t, rec, http.StatusBadRequest, "VALIDATION_ERROR", "task title is required")
 }
 
 func TestTaskRoutesHideRepositoryErrors(t *testing.T) {
@@ -163,7 +178,7 @@ func TestTaskRoutesHideRepositoryErrors(t *testing.T) {
 
 		router.ServeHTTP(rec, req)
 
-		assertErrorResponse(t, rec, http.StatusInternalServerError, "internal server error")
+		assertErrorResponse(t, rec, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 	})
 
 	t.Run("list", func(t *testing.T) {
@@ -172,7 +187,7 @@ func TestTaskRoutesHideRepositoryErrors(t *testing.T) {
 
 		router.ServeHTTP(rec, req)
 
-		assertErrorResponse(t, rec, http.StatusInternalServerError, "internal server error")
+		assertErrorResponse(t, rec, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 	})
 }
 
@@ -180,6 +195,7 @@ func assertErrorResponse(
 	t *testing.T,
 	rec *httptest.ResponseRecorder,
 	expectedStatus int,
+	expectedCode string,
 	expectedMessage string,
 ) {
 	t.Helper()
@@ -194,7 +210,11 @@ func assertErrorResponse(
 		t.Fatalf("decoding error response: %v", err)
 	}
 
-	if response.Error != expectedMessage {
-		t.Errorf("expected error %q, got %q", expectedMessage, response.Error)
+	if response.Error.Code != expectedCode {
+		t.Errorf("expected error code %q, got %q", expectedCode, response.Error.Code)
+	}
+
+	if response.Error.Message != expectedMessage {
+		t.Errorf("expected error message %q, got %q", expectedMessage, response.Error.Message)
 	}
 }

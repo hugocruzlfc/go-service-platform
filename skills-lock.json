@@ -1,0 +1,191 @@
+{
+  "version": 1,
+  "skills": {
+    "git-commit": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(workflow)/git-commit/SKILL.md",
+      "computedHash": "7def5c33a359a1a4a98a84d3a9ea8c3adf40188d7e485c7250a3f4b013a8618a"
+    },
+    "go-api-design": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(architecture)/go-api-design/SKILL.md",
+      "computedHash": "23df57152c1e4f7b61b9eb2edc4527a418e07d7410b33a9c1b18194b30b0792b"
+    },
+    "go-binary-size": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(workflow)/go-binary-size/SKILL.md",
+      "computedHash": "f2ee83fd941a21350e16f4623a4e1d764fd6e0844fe10a25802977a67289c9c2"
+    },
+    "go-build-release": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(workflow)/go-build-release/SKILL.md",
+      "computedHash": "bbcfbb3c92def76e2960c99933a5e551749274bc9347b04b6bf302f06dedfd3b"
+    },
+    "go-ci": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(workflow)/go-ci/SKILL.md",
+      "computedHash": "560bee85f01aa65f96a28a8235f4b8f8f2b15185f11ba4ce48cd6d76280ba70d"
+    },
+    "go-cli": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(architecture)/go-cli/SKILL.md",
+      "computedHash": "c391f28453602190e2af679278cb60df76d2b5e4cee38748d09b117160fe9e4a"
+    },
+    "go-coding-standards": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(code-quality)/go-coding-standards/SKILL.md",
+      "computedHash": "14d197e28d2c67afe206ad8b8b0bc15c4b1e41aeb38cb973d9847bafe29dd9df"
+    },
+    "go-concurrency-review": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(safety)/go-concurrency-review/SKILL.md",
+      "computedHash": "f63bc997cd039a456cb8d9769f4af665eec7c77d647600a151f20956c2cc2fb1"
+    },
+    "go-context": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(code-quality)/go-context/SKILL.md",
+      "computedHash": "ddc056d2dd6bac7c53a786d9a1304b5c3a223324aacf9731c51a434992e34597"
+    },
+    "go-data-structures": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(code-quality)/go-data-structures/SKILL.md",
+      "computedHash": "ea1143f6a1751f73d070bcf051396b1c243c481815c04f38a70a7501cf943505"
+    },
+    "go-database": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(data)/go-database/SKILL.md",
+      "computedHash": "d5ea4c89e7183501567ef64c782c478f2f154195bd2660973129fef5ce7f4841"
+    },
+    "go-defensive-coding": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(safety)/go-defensive-coding/SKILL.md",
+      "computedHash": "1a6d4c163eba54193d18d8af7ce29f155e8cf20723f060b27b9b327782e8a130"
+    },
+    "go-dependency-injection": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(architecture)/go-dependency-injection/SKILL.md",
+      "computedHash": "5b7f835e6e7225e7093731735899ad559febea4cfa59fb7f3fe83ad55106da43"
+    },
+    "go-design-patterns": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(architecture)/go-design-patterns/SKILL.md",
+      "computedHash": "5fbce05414be5e913985a8ecaa3782bbb3fc0ac37236ba3e817bdee8ccf3a392"
+    },
+    "go-documentation": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(code-quality)/go-documentation/SKILL.md",
+      "computedHash": "c857372dfbe6d634e7fa919e4b02408af6befaefb553c105e9b508cfeabd0000"
+    },
+    "go-error-handling": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(code-quality)/go-error-handling/SKILL.md",
+      "computedHash": "36bded170cb75dc48e61b105e4471d5e5e1c1316e75c0fd76b6f93e656fab945"
+    },
+    "go-graphql": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(architecture)/go-graphql/SKILL.md",
+      "computedHash": "19e2fbd5813b2265b9a627be995c940561c695fc702ab638073d3f5099733318"
+    },
+    "go-grpc": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(architecture)/go-grpc/SKILL.md",
+      "computedHash": "2406492c0c3c0018c1c79b3c89a77f5ad6eaa7ce1cffffa1ea7ede5b65cd912b"
+    },
+    "go-interface-design": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(architecture)/go-interface-design/SKILL.md",
+      "computedHash": "438dca8e86a80ba0a044a93fcf011e11ee72a1b38d986e70a5f8208570391c29"
+    },
+    "go-modernize": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(code-quality)/go-modernize/SKILL.md",
+      "computedHash": "408d029adc8cc9974cbaca4738f18b99542279b3690a90a48512bdd46c26a077"
+    },
+    "go-naming": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(code-quality)/go-naming/SKILL.md",
+      "computedHash": "8a27b6a847dbba3907e4ac935992d3054932944cfdae70a74c3ba63aaf470a34"
+    },
+    "go-observability": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(safety)/go-observability/SKILL.md",
+      "computedHash": "3922f5f3c31ed1d028846529776eb304a8a5e547cf1b8329547d42eee9e89f23"
+    },
+    "go-openapi": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(architecture)/go-openapi/SKILL.md",
+      "computedHash": "4f951b9a6ad7331df2c8aeb15da294b87ec40061d234dc1ce1f1a78d84527cc1"
+    },
+    "go-performance-review": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(safety)/go-performance-review/SKILL.md",
+      "computedHash": "ddc9dd71ef511673c08d31e3ce8d7829cacc32376927d02572b170c30bb71a28"
+    },
+    "go-project-layout": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(architecture)/go-project-layout/SKILL.md",
+      "computedHash": "d0e6dd913328d4e2e82031d6aaf54409c47232a6cd5bc9504b3a48abd89e3217"
+    },
+    "go-refactoring": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(workflow)/go-refactoring/SKILL.md",
+      "computedHash": "97f1e30e80974c19a3b27273d5ff6cc69c9aeefaf9b6501c24c720bee8f15b88"
+    },
+    "go-semantic-tools": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(workflow)/go-semantic-tools/SKILL.md",
+      "computedHash": "195a24f5f5cd2fb9340e12534aa1d04449f6adcc2eda50f98397f55998687369"
+    },
+    "go-skills-router": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(workflow)/go-skills-router/SKILL.md",
+      "computedHash": "b69c5c1a330c2abce95652295af322894846ef49239d932ed08fa2d44e76db16"
+    },
+    "go-test-quality": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(testing)/go-test-quality/SKILL.md",
+      "computedHash": "aaa8a367e648dfc7a62da6805966cd7698ef6027b5d10bbe304c0a30a236fd43"
+    },
+    "go-test-table-driven": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(testing)/go-test-table-driven/SKILL.md",
+      "computedHash": "6042ea9a00821a28a4a074136fd8ac6a8adffb0ab65a3c8319ec69ce0b69945f"
+    },
+    "go-troubleshooting": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(safety)/go-troubleshooting/SKILL.md",
+      "computedHash": "9bc6ba6593d2bc68c6aa79ec8da9ce25353d0a58a6a58d2521fc95b099645d2a"
+    }
+  }
+}

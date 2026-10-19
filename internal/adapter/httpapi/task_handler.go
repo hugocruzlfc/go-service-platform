@@ -26,7 +26,12 @@ type createTaskRequest struct {
 }
 
 type errorResponse struct {
-	Error string `json:"error"`
+	Error errorDetail `json:"error"`
+}
+
+type errorDetail struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }
 
 func (h *taskHandler) createTask(
@@ -35,20 +40,18 @@ func (h *taskHandler) createTask(
 ) {
 	var request createTaskRequest
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(&request); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse{
-			Error: "invalid request body",
-		})
+		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "invalid request body")
 		return
 	}
 
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		writeJSON(w, http.StatusBadRequest, errorResponse{
-			Error: "invalid request body",
-		})
+		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "invalid request body")
 		return
 	}
 
@@ -57,17 +60,13 @@ func (h *taskHandler) createTask(
 		if errors.Is(err, domain.ErrTaskIDRequired) ||
 			errors.Is(err, domain.ErrTaskTitleRequired) ||
 			errors.Is(err, domain.ErrTaskTitleTooLong) {
-			writeJSON(w, http.StatusBadRequest, errorResponse{
-				Error: err.Error(),
-			})
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", validationErrorMessage(err))
 			return
 		}
 
 		log.Printf("creating task: %v", err)
 
-		writeJSON(w, http.StatusInternalServerError, errorResponse{
-			Error: "internal server error",
-		})
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 		return
 	}
 
@@ -82,13 +81,33 @@ func (h *taskHandler) listTasks(
 	if err != nil {
 		log.Printf("listing tasks: %v", err)
 
-		writeJSON(w, http.StatusInternalServerError, errorResponse{
-			Error: "internal server error",
-		})
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 		return
 	}
 
 	writeJSON(w, http.StatusOK, tasks)
+}
+
+func validationErrorMessage(err error) string {
+	switch {
+	case errors.Is(err, domain.ErrTaskIDRequired):
+		return "task ID is required"
+	case errors.Is(err, domain.ErrTaskTitleRequired):
+		return "task title is required"
+	case errors.Is(err, domain.ErrTaskTitleTooLong):
+		return "task title must not exceed 120 characters"
+	default:
+		return "invalid task"
+	}
+}
+
+func writeError(w http.ResponseWriter, status int, code, message string) {
+	writeJSON(w, status, errorResponse{
+		Error: errorDetail{
+			Code:    code,
+			Message: message,
+		},
+	})
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {
