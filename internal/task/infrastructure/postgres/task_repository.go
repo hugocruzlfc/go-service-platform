@@ -1,0 +1,85 @@
+package postgres
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"service-platform/internal/task/application"
+	"service-platform/internal/task/domain"
+)
+
+var _ application.TaskRepository = (*TaskRepository)(nil)
+
+type TaskRepository struct {
+	pool *pgxpool.Pool
+}
+
+func NewTaskRepository(pool *pgxpool.Pool) *TaskRepository {
+	return &TaskRepository{
+		pool: pool,
+	}
+}
+
+func (r *TaskRepository) Create(
+	ctx context.Context,
+	task domain.Task,
+) error {
+	const query = `
+		INSERT INTO tasks (id, title, completed, created_at)
+		VALUES ($1, $2, $3, $4)
+	`
+
+	if _, err := r.pool.Exec(
+		ctx,
+		query,
+		task.ID,
+		task.Title,
+		task.Completed,
+		task.CreatedAt,
+	); err != nil {
+		return fmt.Errorf("insert task: %w", err)
+	}
+
+	return nil
+}
+
+func (r *TaskRepository) List(
+	ctx context.Context,
+) ([]domain.Task, error) {
+	const query = `
+		SELECT id, title, completed, created_at
+		FROM tasks
+		ORDER BY id
+	`
+
+	rows, err := r.pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("query tasks: %w", err)
+	}
+	defer rows.Close()
+
+	tasks := make([]domain.Task, 0)
+
+	for rows.Next() {
+		var task domain.Task
+
+		if err := rows.Scan(
+			&task.ID,
+			&task.Title,
+			&task.Completed,
+			&task.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan task: %w", err)
+		}
+
+		tasks = append(tasks, task)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate tasks: %w", err)
+	}
+
+	return tasks, nil
+}

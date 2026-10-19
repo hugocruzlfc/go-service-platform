@@ -14,10 +14,15 @@ func TestLoadUsesDefaultPort(t *testing.T) {
 	if config.HTTPAddr != ":8080" {
 		t.Errorf("expected address %q, got %q", ":8080", config.HTTPAddr)
 	}
+
+	if config.DatabaseURL == "" {
+		t.Error("expected a default database URL")
+	}
 }
 
 func TestLoadUsesConfiguredPort(t *testing.T) {
 	t.Setenv("PORT", "9090")
+	t.Setenv("DATABASE_URL", "postgres://example/database")
 
 	config, err := Load()
 
@@ -27,6 +32,10 @@ func TestLoadUsesConfiguredPort(t *testing.T) {
 
 	if config.HTTPAddr != ":9090" {
 		t.Errorf("expected address %q, got %q", ":9090", config.HTTPAddr)
+	}
+
+	if config.DatabaseURL != "postgres://example/database" {
+		t.Errorf("expected database URL %q, got %q", "postgres://example/database", config.DatabaseURL)
 	}
 }
 

@@ -13,7 +13,9 @@ import (
 	"service-platform/internal/adapter/httpapi"
 	"service-platform/internal/config"
 	"service-platform/internal/task/application"
-	"service-platform/internal/task/infrastructure/memory"
+	"service-platform/internal/task/infrastructure/postgres"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -22,7 +24,23 @@ func main() {
 		log.Fatal(err)
 	}
 
-	repository := memory.NewTaskRepository()
+	databaseContext, cancelDatabase := context.WithTimeout(
+		context.Background(),
+		5*time.Second,
+	)
+	defer cancelDatabase()
+
+	databasePool, err := pgxpool.New(databaseContext, config.DatabaseURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer databasePool.Close()
+
+	if err := databasePool.Ping(databaseContext); err != nil {
+		log.Fatal(err)
+	}
+
+	repository := postgres.NewTaskRepository(databasePool)
 	service := application.NewTaskService(repository)
 	router := httpapi.NewRouter(service)
 

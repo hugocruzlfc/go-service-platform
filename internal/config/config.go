@@ -7,9 +7,11 @@ import (
 )
 
 const defaultPort = 8080
+const defaultDatabaseURL = "postgres://service_platform:service_platform_dev@localhost:5432/service_platform?sslmode=disable"
 
 type Config struct {
-	HTTPAddr string
+	HTTPAddr    string
+	DatabaseURL string
 }
 
 func Load() (Config, error) {
@@ -28,7 +30,13 @@ func Load() (Config, error) {
 		port = parsedPort
 	}
 
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		databaseURL = defaultDatabaseURL
+	}
+
 	return Config{
-		HTTPAddr: fmt.Sprintf(":%d", port),
+		HTTPAddr:    fmt.Sprintf(":%d", port),
+		DatabaseURL: databaseURL,
 	}, nil
 }
