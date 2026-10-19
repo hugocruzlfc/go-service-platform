@@ -147,7 +147,9 @@ The API connects to PostgreSQL and starts the HTTP server. It does not run datab
 go run ./cmd/api
 ```
 
-Keep this terminal open. Stop the API with `Ctrl+C`; it will perform a graceful shutdown.
+Keep this terminal open. Stop the API with `Ctrl+C`; it will first mark the
+service as not ready, wait briefly for traffic to drain, and then perform a
+graceful shutdown.
 
 By default it listens on `:8080`. To use another port:
 

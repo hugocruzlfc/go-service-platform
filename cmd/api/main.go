@@ -47,7 +47,8 @@ func run(ctx context.Context, logger *slog.Logger) error {
 
 	repository := postgres.NewTaskRepository(databasePool)
 	service := application.NewTaskService(repository)
-	router := httpapi.NewRouter(service, databasePool, logger)
+	readiness := httpapi.NewReadiness(databasePool, logger)
+	router := httpapi.NewRouter(service, readiness, logger)
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -81,6 +82,11 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return nil
 	case <-stopSignals.Done():
 		logger.Info("shutdown signal received")
+		readiness.BeginDraining()
+		logger.Info("service is draining")
+
+		drainTimer := time.NewTimer(time.Second)
+		<-drainTimer.C
 
 		shutdownContext, cancel := context.WithTimeout(
 			context.WithoutCancel(stopSignals),

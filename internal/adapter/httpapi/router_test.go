@@ -25,8 +25,9 @@ func newTestRouter() http.Handler {
 	repository := memory.NewTaskRepository()
 	service := application.NewTaskService(repository)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	readiness := NewReadiness(fakeDatabasePinger{}, logger)
 
-	return NewRouter(service, fakeDatabasePinger{}, logger)
+	return NewRouter(service, readiness, logger)
 }
 
 func TestVersionRoute(t *testing.T) {
@@ -122,7 +123,8 @@ func TestReadinessRoute(t *testing.T) {
 			repository := memory.NewTaskRepository()
 			service := application.NewTaskService(repository)
 			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-			router := NewRouter(service, fakeDatabasePinger{err: test.databaseErr}, logger)
+			readiness := NewReadiness(fakeDatabasePinger{err: test.databaseErr}, logger)
+			router := NewRouter(service, readiness, logger)
 
 			req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 			rec := httptest.NewRecorder()
@@ -137,5 +139,40 @@ func TestReadinessRoute(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+func TestReadinessRouteDuringShutdown(t *testing.T) {
+	repository := memory.NewTaskRepository()
+	service := application.NewTaskService(repository)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	readiness := NewReadiness(fakeDatabasePinger{}, logger)
+	readiness.BeginDraining()
+	router := NewRouter(service, readiness, logger)
+
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusServiceUnavailable,
+			rec.Code,
+		)
+	}
+
+	livenessRequest := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	livenessResponse := httptest.NewRecorder()
+
+	router.ServeHTTP(livenessResponse, livenessRequest)
+
+	if livenessResponse.Code != http.StatusOK {
+		t.Fatalf(
+			"expected liveness status %d, got %d",
+			http.StatusOK,
+			livenessResponse.Code,
+		)
 	}
 }

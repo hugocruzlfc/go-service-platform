@@ -10,7 +10,7 @@ import (
 // NewRouter creates the HTTP handler tree for the task API.
 func NewRouter(
 	service *application.TaskService,
-	databasePinger DatabasePinger,
+	readiness *Readiness,
 	logger *slog.Logger,
 ) http.Handler {
 	mux := http.NewServeMux()
@@ -19,7 +19,7 @@ func NewRouter(
 
 	mux.Handle("GET /health", healthHandler(logger))
 	mux.Handle("GET /healthz", healthHandler(logger))
-	mux.Handle("GET /readyz", readinessHandler(databasePinger, logger))
+	mux.Handle("GET /readyz", readiness.handler())
 	mux.Handle("GET /version", versionHandler(logger))
 	mux.HandleFunc("POST /tasks", tasks.createTask)
 	mux.HandleFunc("GET /tasks", tasks.listTasks)
