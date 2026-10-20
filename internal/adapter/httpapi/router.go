@@ -21,6 +21,8 @@ func NewRouter(
 	mux.Handle("GET /healthz", healthHandler(logger))
 	mux.Handle("GET /readyz", readiness.handler())
 	mux.Handle("GET /version", versionHandler(logger))
+	mux.Handle("GET /openapi.json", openAPIHandler(logger))
+	mux.Handle("GET /docs", swaggerUIHandler())
 	mux.HandleFunc("POST /tasks", tasks.createTask)
 	mux.HandleFunc("GET /tasks", tasks.listTasks)
 

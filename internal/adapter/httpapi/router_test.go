@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"service-platform/internal/task/application"
@@ -63,6 +64,46 @@ func TestVersionRoute(t *testing.T) {
 			"1.0.0",
 			response.Version,
 		)
+	}
+}
+
+func TestOpenAPIRoute(t *testing.T) {
+	router := newTestRouter()
+	req := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	if contentType := rec.Header().Get("Content-Type"); contentType != "application/json" {
+		t.Errorf("expected content type %q, got %q", "application/json", contentType)
+	}
+
+	if !strings.Contains(rec.Body.String(), `"openapi":"3.0.3"`) {
+		t.Error("expected the embedded OpenAPI document")
+	}
+}
+
+func TestDocsRoute(t *testing.T) {
+	router := newTestRouter()
+	req := httptest.NewRequest(http.MethodGet, "/docs", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	if contentType := rec.Header().Get("Content-Type"); contentType != "text/html; charset=utf-8" {
+		t.Errorf("expected content type %q, got %q", "text/html; charset=utf-8", contentType)
+	}
+
+	if !strings.Contains(rec.Body.String(), "SwaggerUIBundle") {
+		t.Error("expected Swagger UI page")
 	}
 }
 

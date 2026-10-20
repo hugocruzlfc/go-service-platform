@@ -1,0 +1,211 @@
+openapi: 3.0.3
+info:
+  title: Go Service Platform API
+  version: 1.0.0
+  description: HTTP API for managing tasks and reporting service health.
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Check service liveness
+      description: Returns a successful response while the service process is running.
+      tags:
+        - health
+      responses:
+        '200':
+          description: Service is alive.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /healthz:
+    get:
+      operationId: getHealthz
+      summary: Check service liveness
+      description: Kubernetes-style alias for the health endpoint.
+      tags:
+        - health
+      responses:
+        '200':
+          description: Service is alive.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /readyz:
+    get:
+      operationId: getReadiness
+      summary: Check service readiness
+      description: Returns whether the service can receive traffic.
+      tags:
+        - health
+      responses:
+        '200':
+          description: Service is ready.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Service is not ready.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /version:
+    get:
+      operationId: getVersion
+      summary: Get service version
+      tags:
+        - system
+      responses:
+        '200':
+          description: Current service version.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionResponse'
+
+  /tasks:
+    get:
+      operationId: listTasks
+      summary: List tasks
+      tags:
+        - tasks
+      responses:
+        '200':
+          description: Tasks ordered by ID.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      operationId: createTask
+      summary: Create a task
+      tags:
+        - tasks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+      responses:
+        '201':
+          description: Task created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          description: Invalid request body or task title.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    CreateTaskRequest:
+      type: object
+      description: Payload used to create a task.
+      required:
+        - title
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          description: Task title. Whitespace is trimmed by the service.
+          maxLength: 120
+
+    ErrorDetail:
+      type: object
+      description: Machine-readable error information returned by the current API.
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Stable application error code.
+        message:
+          type: string
+          description: Safe human-readable error message.
+
+    ErrorResponse:
+      type: object
+      description: Error response returned by the current API.
+      required:
+        - error
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+
+    HealthResponse:
+      type: object
+      description: Service health status and response timestamp.
+      required:
+        - status
+        - time
+      properties:
+        status:
+          type: string
+          description: Current health status.
+        time:
+          type: string
+          format: date-time
+          description: UTC timestamp at which the response was generated.
+
+    Task:
+      type: object
+      description: A task managed by the service.
+      required:
+        - id
+        - title
+        - completed
+        - createdAt
+      properties:
+        id:
+          type: string
+          description: Unique task identifier.
+        title:
+          type: string
+          description: Trimmed task title.
+        completed:
+          type: boolean
+          description: Whether the task has been completed.
+        createdAt:
+          type: string
+          format: date-time
+          description: UTC timestamp at which the task was created.
+
+    VersionResponse:
+      type: object
+      description: Current service version.
+      required:
+        - version
+      properties:
+        version:
+          type: string
+          description: Semantic version of the service.

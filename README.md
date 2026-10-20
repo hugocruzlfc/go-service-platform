@@ -80,6 +80,31 @@ go mod tidy
 - `go mod why -m` explains why a module is required.
 - `go mod tidy` synchronizes `go.mod` and `go.sum` with the source code.
 
+## OpenAPI contract
+
+The API contract is defined in [`api/openapi.yaml`](api/openapi.yaml). It is
+the source of truth for generated Go models, HTTP server interfaces, and the
+client used by contract tests.
+
+Regenerate the checked-in API code after changing the specification:
+
+```bash
+go generate ./internal/api
+```
+
+The generator is pinned as a Go tool in `go.mod`, so the same version is used
+locally and in CI. Generated files must not be edited manually.
+
+To inspect the contract directly:
+
+```bash
+sed -n '1,260p' api/openapi.yaml
+```
+
+The running API will expose the generated contract after the HTTP adapter
+integration is completed. Until then, running `go run ./cmd/api` starts the
+existing API, while the YAML remains a checked-in design contract.
+
 ### Useful local development commands
 
 ```bash
@@ -168,6 +193,18 @@ curl --fail --silent http://localhost:8080/readyz
 curl --fail --silent http://localhost:8080/version
 curl --fail --silent http://localhost:8080/tasks
 ```
+
+Open the interactive API documentation in a browser:
+
+```text
+http://localhost:8080/docs
+```
+
+Swagger UI loads the generated OpenAPI document from
+`http://localhost:8080/openapi.json`. The documentation page uses the Swagger
+UI assets from a CDN, so the browser needs internet access to render the UI.
+The raw contract remains available in `api/openapi.yaml` and is embedded into
+the generated Go package.
 
 `/health` and `/healthz` are liveness checks. They confirm that the process is
 running and do not depend on PostgreSQL. `/readyz` is a readiness check: it
