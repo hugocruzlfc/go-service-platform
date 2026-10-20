@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"service-platform/internal/api"
 	"service-platform/internal/task/application"
 )
 
@@ -15,16 +16,26 @@ func NewRouter(
 ) http.Handler {
 	mux := http.NewServeMux()
 
-	tasks := newTaskHandler(service, logger)
-
-	mux.Handle("GET /health", healthHandler(logger))
-	mux.Handle("GET /healthz", healthHandler(logger))
-	mux.Handle("GET /readyz", readiness.handler())
-	mux.Handle("GET /version", versionHandler(logger))
 	mux.Handle("GET /openapi.json", openAPIHandler(logger))
 	mux.Handle("GET /docs", swaggerUIHandler())
-	mux.HandleFunc("POST /tasks", tasks.createTask)
-	mux.HandleFunc("GET /tasks", tasks.listTasks)
 
-	return mux
+	server := newStrictServer(service, readiness, logger)
+	strictHandler := api.NewStrictHandlerWithOptions(server, nil, api.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			writeError(logger, w, http.StatusBadRequest, "INVALID_REQUEST", "invalid request body")
+		},
+		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			logger.Error("writing API response", slog.Any("error", err))
+			writeError(logger, w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		},
+	})
+
+	api.HandlerWithOptions(strictHandler, api.StdHTTPServerOptions{
+		BaseRouter: mux,
+		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			writeError(logger, w, http.StatusBadRequest, "INVALID_REQUEST", "invalid request")
+		},
+	})
+
+	return requestBodyMiddleware(logger, mux)
 }

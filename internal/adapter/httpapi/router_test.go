@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"service-platform/internal/api"
 	"service-platform/internal/task/application"
 	"service-platform/internal/task/infrastructure/memory"
 )
@@ -52,7 +53,7 @@ func TestVersionRoute(t *testing.T) {
 		)
 	}
 
-	var response VersionResponse
+	var response api.VersionResponse
 
 	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
 		t.Fatalf("decoding response: %v", err)

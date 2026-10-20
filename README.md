@@ -101,9 +101,9 @@ To inspect the contract directly:
 sed -n '1,260p' api/openapi.yaml
 ```
 
-The running API will expose the generated contract after the HTTP adapter
-integration is completed. Until then, running `go run ./cmd/api` starts the
-existing API, while the YAML remains a checked-in design contract.
+The running API exposes the generated contract at `/openapi.json` and the
+interactive Swagger UI at `/docs` after the service is started. The YAML
+remains the checked-in design contract.
 
 ### Useful local development commands
 
