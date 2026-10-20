@@ -73,6 +73,37 @@ func TestTaskRepositoryRejectsDuplicateID(t *testing.T) {
 	}
 }
 
+func TestTaskRepositoryGet(t *testing.T) {
+	repository := NewTaskRepository()
+	ctx := t.Context()
+	task, err := domain.NewTask("task-1", "Learn Go", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := repository.Create(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := repository.Get(ctx, "task-1")
+	if err != nil {
+		t.Fatalf("getting task: %v", err)
+	}
+	if got != task {
+		t.Errorf("expected task %#v, got %#v", task, got)
+	}
+}
+
+func TestTaskRepositoryGetReturnsNotFound(t *testing.T) {
+	repository := NewTaskRepository()
+
+	_, err := repository.Get(t.Context(), "missing")
+
+	if !errors.Is(err, domain.ErrTaskNotFound) {
+		t.Errorf("expected domain.ErrTaskNotFound, got %v", err)
+	}
+}
+
 func TestTaskRepositoryRejectsCancelledContext(t *testing.T) {
 	repository := NewTaskRepository()
 

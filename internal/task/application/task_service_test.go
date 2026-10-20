@@ -11,10 +11,13 @@ import (
 
 type fakeTaskRepository struct {
 	createdTasks []domain.Task
+	gottenTasks  map[string]domain.Task
 	listedTasks  []domain.Task
 	createErr    error
+	getErr       error
 	listErr      error
 	createCtx    context.Context
+	getCtx       context.Context
 	listCtx      context.Context
 }
 
@@ -30,6 +33,24 @@ func (r *fakeTaskRepository) Create(
 
 	r.createdTasks = append(r.createdTasks, task)
 	return nil
+}
+
+func (r *fakeTaskRepository) Get(
+	ctx context.Context,
+	id string,
+) (domain.Task, error) {
+	r.getCtx = ctx
+
+	if r.getErr != nil {
+		return domain.Task{}, r.getErr
+	}
+
+	task, exists := r.gottenTasks[id]
+	if !exists {
+		return domain.Task{}, domain.ErrTaskNotFound
+	}
+
+	return task, nil
 }
 
 func (r *fakeTaskRepository) List(
@@ -108,6 +129,37 @@ func TestTaskServiceListTasks(t *testing.T) {
 
 	if repository.listCtx != ctx {
 		t.Error("expected the service to pass the context to the repository")
+	}
+}
+
+func TestTaskServiceGetTask(t *testing.T) {
+	expectedTask := domain.Task{ID: "task-1", Title: "Learn Go"}
+	repository := &fakeTaskRepository{
+		gottenTasks: map[string]domain.Task{"task-1": expectedTask},
+	}
+	service := NewTaskService(repository)
+	ctx := t.Context()
+
+	task, err := service.GetTask(ctx, " task-1 ")
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if task != expectedTask {
+		t.Errorf("expected task %#v, got %#v", expectedTask, task)
+	}
+	if repository.getCtx != ctx {
+		t.Error("expected the service to pass the context to the repository")
+	}
+}
+
+func TestTaskServiceGetTaskReturnsNotFound(t *testing.T) {
+	service := NewTaskService(&fakeTaskRepository{})
+
+	_, err := service.GetTask(t.Context(), "missing")
+
+	if !errors.Is(err, domain.ErrTaskNotFound) {
+		t.Errorf("expected domain.ErrTaskNotFound, got %v", err)
 	}
 }
 

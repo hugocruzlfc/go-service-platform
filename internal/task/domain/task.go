@@ -11,6 +11,7 @@ var (
 	ErrTaskIDRequired    = errors.New("task ID is required")
 	ErrTaskTitleRequired = errors.New("task title is required")
 	ErrTaskTitleTooLong  = errors.New("task title must not exceed 120 characters")
+	ErrTaskNotFound      = errors.New("task not found")
 )
 
 // Task represents a task managed by the service.

@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/oapi-codegen/runtime"
 )
 
 // CreateTaskRequest Payload used to create a task.
@@ -190,6 +191,11 @@ type ClientInterface interface {
 	// Corresponds with POST /tasks (the `CreateTask` operationId).
 	CreateTask(ctx context.Context, body CreateTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetTask Get a task
+	//
+	// Corresponds with GET /tasks/{id} (the `GetTask` operationId).
+	GetTask(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetVersion Get service version
 	//
 	// Corresponds with GET /version (the `GetVersion` operationId).
@@ -286,6 +292,21 @@ func (c *Client) CreateTaskWithBody(ctx context.Context, contentType string, bod
 // Corresponds with POST /tasks (the `CreateTask` operationId).
 func (c *Client) CreateTask(ctx context.Context, body CreateTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateTaskRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetTask Get a task
+//
+// Corresponds with GET /tasks/{id} (the `GetTask` operationId).
+func (c *Client) GetTask(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetTaskRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -459,6 +480,40 @@ func NewCreateTaskRequestWithBody(server string, contentType string, body io.Rea
 	return req, nil
 }
 
+// NewGetTaskRequest constructs an http.Request for the GetTask method
+func NewGetTaskRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/tasks/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetVersionRequest constructs an http.Request for the GetVersion method
 func NewGetVersionRequest(server string) (*http.Request, error) {
 	var err error
@@ -577,6 +632,13 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /tasks (the `CreateTask` operationId).
 	CreateTaskWithResponse(ctx context.Context, body CreateTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTaskResponse, error)
+
+	// GetTaskWithResponse Get a task
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /tasks/{id} (the `GetTask` operationId).
+	GetTaskWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetTaskResponse, error)
 
 	// GetVersionWithResponse Get service version
 	//
@@ -819,6 +881,61 @@ func (r CreateTaskResponse) ContentType() string {
 	return ""
 }
 
+type GetTaskResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Task
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetTaskResponse) GetJSON200() *Task {
+	return r.JSON200
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetTaskResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetTaskResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetTaskResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetTaskResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetTaskResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetTaskResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetVersionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -942,6 +1059,19 @@ func (c *ClientWithResponses) CreateTaskWithResponse(ctx context.Context, body C
 		return nil, err
 	}
 	return ParseCreateTaskResponse(rsp)
+}
+
+// GetTaskWithResponse Get a task
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /tasks/{id} (the `GetTask` operationId).
+func (c *ClientWithResponses) GetTaskWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetTaskResponse, error) {
+	rsp, err := c.GetTask(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetTaskResponse(rsp)
 }
 
 // GetVersionWithResponse Get service version
@@ -1115,6 +1245,46 @@ func ParseCreateTaskResponse(rsp *http.Response) (*CreateTaskResponse, error) {
 	return response, nil
 }
 
+// ParseGetTaskResponse parses an HTTP response from a GetTaskWithResponse call
+func ParseGetTaskResponse(rsp *http.Response) (*GetTaskResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetTaskResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Task
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetVersionResponse parses an HTTP response from a GetVersionWithResponse call
 func ParseGetVersionResponse(rsp *http.Response) (*GetVersionResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -1158,6 +1328,9 @@ type ServerInterface interface {
 	// CreateTask Create a task
 	// (POST /tasks)
 	CreateTask(w http.ResponseWriter, r *http.Request)
+	// GetTask Get a task
+	// (GET /tasks/{id})
+	GetTask(w http.ResponseWriter, r *http.Request, id string)
 	// GetVersion Get service version
 	// (GET /version)
 	GetVersion(w http.ResponseWriter, r *http.Request)
@@ -1233,6 +1406,32 @@ func (siw *ServerInterfaceWrapper) CreateTask(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateTask(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetTask operation middleware
+func (siw *ServerInterfaceWrapper) GetTask(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetTask(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1382,6 +1581,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/version", wrapper.GetVersion)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tasks", wrapper.ListTasks)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tasks", wrapper.CreateTask)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tasks/{id}", wrapper.GetTask)
 
 	return m
 }
@@ -1548,6 +1748,56 @@ func (response CreateTask500JSONResponse) VisitCreateTaskResponse(w http.Respons
 	return err
 }
 
+type GetTaskRequestObject struct {
+	Id string `json:"id"`
+}
+
+type GetTaskResponseObject interface {
+	VisitGetTaskResponse(w http.ResponseWriter) error
+}
+
+type GetTask200JSONResponse Task
+
+func (response GetTask200JSONResponse) VisitGetTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTask404JSONResponse ErrorResponse
+
+func (response GetTask404JSONResponse) VisitGetTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTask500JSONResponse ErrorResponse
+
+func (response GetTask500JSONResponse) VisitGetTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetVersionRequestObject struct {
 }
 
@@ -1586,6 +1836,9 @@ type StrictServerInterface interface {
 	// CreateTask Create a task
 	// (POST /tasks)
 	CreateTask(ctx context.Context, request CreateTaskRequestObject) (CreateTaskResponseObject, error)
+	// GetTask Get a task
+	// (GET /tasks/{id})
+	GetTask(ctx context.Context, request GetTaskRequestObject) (GetTaskResponseObject, error)
 	// GetVersion Get service version
 	// (GET /version)
 	GetVersion(ctx context.Context, request GetVersionRequestObject) (GetVersionResponseObject, error)
@@ -1757,6 +2010,32 @@ func (sh *strictHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetTask operation middleware
+func (sh *strictHandler) GetTask(w http.ResponseWriter, r *http.Request, id string) {
+	var request GetTaskRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetTask(ctx, request.(GetTaskRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetTask")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetTaskResponseObject); ok {
+		if err := validResponse.VisitGetTaskResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetVersion operation middleware
 func (sh *strictHandler) GetVersion(w http.ResponseWriter, r *http.Request) {
 	var request GetVersionRequestObject
@@ -1786,25 +2065,26 @@ func (sh *strictHandler) GetVersion(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"3FdRb9s2EP4rxG2Pqu00G1DoLUuHNFgGBGm6Pgx5OItni41EKuTJmRP4vw9HybZsyfGKZUWxN9k6fvzu",
-	"++6O1DNkrqycJcsB0mcIWU4lxsdzT8h0i+H+hh5qCix/otaGjbNYXHtXkWdDAdIZFoES0BQybyp5Dylc",
-	"47JwqFUdSCt2Kot4ChVjuB9BAlUH4RnYcEHysIsi+6v4bqQ+54YpVJiRMkGxN2VJWk2XinNSgfzCZCTA",
-	"Jf51RXbOOaQnbycJ8LIiSCGwN3YOq1UCnh5q40lD+me78d0mzE2/UMawSuBX751/T4ym6BP7HbPcWHrj",
-	"CTVOC1Ik0crYmfMlSpDyxLW3W4pZ7T1ZVmfXl/38M6cH0v/IERurqjBZg9rsI+Ej2JBe55ZASSHgfAgK",
-	"Z6TyukS7z7ldMoJjUkWO2y0OanZDoXI2DJCIr5Vv33+dQpGsPPzoaQYp/DDe1u64Ldxx17N9+g3AEOsP",
-	"hAXnh2l/bIpL5TFOBUaug0Krt6mwKSkwllWfeBPeRz1vs91BHTRVwPvrP92eb7dVyOoxN1kehdzQesSg",
-	"5mTJI5MW7KY8IQWNTG8i8DHbW/4tjSH9pEv7/M5iq6sSLc4HG3W/A8qqICbdR/qcE+fk4/qImWNQUyKr",
-	"Nos6uk2dKwitEGuGjj7jr1IvbiHKtcv/qW4JmAHyn6x5qFtQo8mymRnyB3weHoLtqOPtMDxqmtGwxks6",
-	"0nYlGXLyD/LBOHu4FdZF29qoFs2Cvp3ti6FmKtGyydZLlZvtF8bLqa2R+/wlUiZwf9MPt7fXMlbUzPmm",
-	"Io2dR0HXfVw5z/Jf2On10UbFFC6cWg+C6wJZKkIgIdnmCiejyWgiQrqKLFYGUjgdTUanIg9yHpUZN9Dy",
-	"OKeByryJUzEoVKHOMgphVhedjs5NQV3BVOWdRMmh6GtrjZ0La/EinhiXWrgTN0MOElhDRTJvJ5Om+SyT",
-	"bc747WEz/hIaB5vxemz47o3RaMfwIDVBYWEWNIrmhros0S+lunLK7jeJSYSlEEcPzoN430p3J8taHZ8O",
-	"CvlbPSVviSm8CbyUc7QwGGIJiH7NckVWV85YfkG0p/+TanL6L5+OVt9jZ+auoTO0ylNGZkGKPc5mJhtU",
-	"7YZQm5bD96FbTHokjfnz5PTVKOzedl5mYB1vWLzgnu9IN2hfnFkd93bFvzKBb2PEv1TeMJXhWP6yE6w2",
-	"Yxi9x+WQDJGRcl6Tby4Cl+9bLybfzotLy+QtFlFq8s3ld98M0a85Fjr6N7/vVglULgyIvv1UguakosC/",
-	"OL18tdz632Kr3UORfU2rnuMnr0agMXrY2O0taZXAT9/W0QUWRg7vKIqaOr1UMtw796TvssrOu9/CA4Um",
-	"fd65Pw12+gVxe1n7L4fs/n1wIOODN8LdnC+oF9LJPCwDUympy6Ionfy/fzhduQwLpWlBhavK9a7kIYHa",
-	"F5BCzlyl43EhcbkLnL6bvJvA6m719wA=",
+	"3FdPb9u4E/0qxPx+R9V2/yxQ6NZNF22wXSBI0+1hkcNYHFtsJFIhR846gb/7YijZli3ZbrFpEOxNtoaP",
+	"b96bGVIPkLmycpYsB0gfIGQ5lRgfzzwh0xWGm0u6rSmw/IlaGzbOYnHhXUWeDQVIZ1gESkBTyLyp5D2k",
+	"cIHLwqFWdSCt2Kks4ilUjOFmBAlUHYQHYMMFycMuiuyv4ruR+pobplBhRsoExd6UJWk1XSrOSQXyC5OR",
+	"AJf49yeyc84hfflqkgAvK4IUAntj57BaJeDptjaeNKR/tRtfb8Lc9BtlDKsEfvPe+ffEaIo+sT8wy42l",
+	"F55Q47QgRRKtjJ05X6IEKU9ce7ulmNXek2X17uK8n3/m9ED6nzliY1UVJmtQm30kfAQb0uvcEigpBJwP",
+	"QeGMVF6XaPc5t0tGcEqqyHG7xUHNLilUzoYBEvG18u37H1MokpWH/3uaQQr/G29rd9wW7rjr2T79BmCI",
+	"9UfCgvPDtD83xaXyGKcCI9dBodXbVNiUFBjLqk+8Ce+jnrXZ7qAOmirg/fVfrs622ypkdZebLI9Cbmjd",
+	"YVBzsuSRSQt2U56QgkamFxH4lO0t/5bGkH7SpX1+72KrqxItzgcbdb8DyqogJt1H+poT5+Tj+oiZY1BT",
+	"Iqs2izq6TZ0rCK0Qa4aOfsc/pF7cQpRrl3+vbgmYAfJfrLmtW1CjybKZGfIHfB4egu2o4+0wPGma0bDG",
+	"SzrSdiUZcvJP8sE4e7gV1kXb2qgWzYK+ne2LoWYq0bLJ1kuVm+0XxvHU1sh9/hIpE7i/6cerqwsZK2rm",
+	"fFORxs6joOs+rpxn+S/s9Ppoo2IKH5xaD4KLAlkqQiAh2eYKL0eT0USEdBVZrAyk8Ho0Gb0WeZDzqMy4",
+	"gZbHOQ1U5mWcikGhCnWWUQizuuh0dG4K6gqmKu8kSg5FX1tr7FxYixfxxDjXwp24GXKQwBoqknk1mTTN",
+	"Z5lsc8ZvD5vxt9A42IzXU8N3b4xGO4YHqQkKC7OgUTQ31GWJfinVlVN2s0lMIiyFOHpwHsT7VrprWdbq",
+	"eH9QyN/rKXlLTOFF4KWco4XBEEtA9GuWK7K6csbyEdHu/0uqyem/vD9ZfXedmbuGztAqTxmZBSn2OJuZ",
+	"bFC1S0JtWg7PQ7eY9Ega85fJ60ejsHvbOc7AOt6wOOKe70g3aF+cWR33dsX/ZAJfxYh/qbxhKsOp/GUn",
+	"WG3GMHqPyyEZIiPlvCbfXATO37deTJ7Oi3PL5C0WUWryzeV33wzRrzkWOvo3v69XCVQuDIi+/VSC5qSi",
+	"wL86vXy03PrfYqvdQ5F9Taue4y8fjUBj9LCx21vSKoE3T+voAgsjh3cURU2dXioZ7p170rOssrPut/BA",
+	"oW36fPxg9Opgs38gbouuQo8lMXmB+f4LqJHXci+BBCyWBGlzb9wtrKSjzf7N7PonDvijRTdztV2X3Jun",
+	"szfuLaN8u//zK68PxMdrq3M3P1RY7YfAzzzA9781BtI9+LXRT3gvpJN5WAamUlKXRVG3oTb55DIslKYF",
+	"Fa4q17uShwRqX0AKOXOVjseFxOUucPp28nYCq+vVPwMA",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

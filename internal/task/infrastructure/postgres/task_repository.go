@@ -2,8 +2,10 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"service-platform/internal/task/application"
@@ -45,6 +47,35 @@ func (r *TaskRepository) Create(
 	}
 
 	return nil
+}
+
+// Get returns a task by ID.
+func (r *TaskRepository) Get(
+	ctx context.Context,
+	id string,
+) (domain.Task, error) {
+	const query = `
+		SELECT id, title, completed, created_at
+		FROM tasks
+		WHERE id = $1
+	`
+
+	var task domain.Task
+
+	err := r.pool.QueryRow(ctx, query, id).Scan(
+		&task.ID,
+		&task.Title,
+		&task.Completed,
+		&task.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Task{}, domain.ErrTaskNotFound
+	}
+	if err != nil {
+		return domain.Task{}, fmt.Errorf("get task: %w", err)
+	}
+
+	return task, nil
 }
 
 func (r *TaskRepository) List(

@@ -26,6 +26,13 @@ func (r failingTaskRepository) Create(
 	return r.err
 }
 
+func (r failingTaskRepository) Get(
+	ctx context.Context,
+	id string,
+) (domain.Task, error) {
+	return domain.Task{}, r.err
+}
+
 func (r failingTaskRepository) List(
 	ctx context.Context,
 ) ([]domain.Task, error) {
@@ -103,6 +110,53 @@ func TestListTasksRoute(t *testing.T) {
 	if tasks[0].Title != "Learn Go" {
 		t.Errorf("expected title %q, got %q", "Learn Go", tasks[0].Title)
 	}
+}
+
+func TestGetTaskRoute(t *testing.T) {
+	router := newTestRouter()
+
+	createRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/tasks",
+		bytes.NewBufferString(`{"title":"Learn Go"}`),
+	)
+	createRecorder := httptest.NewRecorder()
+	router.ServeHTTP(createRecorder, createRequest)
+
+	if createRecorder.Code != http.StatusCreated {
+		t.Fatalf("creating task: expected status %d, got %d", http.StatusCreated, createRecorder.Code)
+	}
+
+	var createdTask domain.Task
+	if err := json.NewDecoder(createRecorder.Body).Decode(&createdTask); err != nil {
+		t.Fatalf("decoding created task: %v", err)
+	}
+
+	getRequest := httptest.NewRequest(http.MethodGet, "/tasks/"+createdTask.ID, nil)
+	getRecorder := httptest.NewRecorder()
+	router.ServeHTTP(getRecorder, getRequest)
+
+	if getRecorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, getRecorder.Code)
+	}
+
+	var task domain.Task
+	if err := json.NewDecoder(getRecorder.Body).Decode(&task); err != nil {
+		t.Fatalf("decoding task: %v", err)
+	}
+	if task != createdTask {
+		t.Errorf("expected task %#v, got %#v", createdTask, task)
+	}
+}
+
+func TestGetTaskRouteReturnsNotFound(t *testing.T) {
+	router := newTestRouter()
+	req := httptest.NewRequest(http.MethodGet, "/tasks/missing", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusNotFound, "NOT_FOUND", "task not found")
 }
 
 func TestCreateTaskRouteRejectsInvalidJSON(t *testing.T) {
@@ -187,6 +241,15 @@ func TestTaskRoutesHideRepositoryErrors(t *testing.T) {
 
 	t.Run("list", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/tasks", nil)
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		assertErrorResponse(t, rec, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+	})
+
+	t.Run("get", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/tasks/task-1", nil)
 		rec := httptest.NewRecorder()
 
 		router.ServeHTTP(rec, req)

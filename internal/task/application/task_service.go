@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	"service-platform/internal/task/domain"
@@ -39,6 +40,24 @@ func (s *TaskService) CreateTask(
 
 	if err := s.repository.Create(ctx, task); err != nil {
 		return domain.Task{}, fmt.Errorf("create task: %w", err)
+	}
+
+	return task, nil
+}
+
+// GetTask returns a task by ID.
+func (s *TaskService) GetTask(
+	ctx context.Context,
+	id string,
+) (domain.Task, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return domain.Task{}, domain.ErrTaskIDRequired
+	}
+
+	task, err := s.repository.Get(ctx, id)
+	if err != nil {
+		return domain.Task{}, fmt.Errorf("get task: %w", err)
 	}
 
 	return task, nil

@@ -89,6 +89,28 @@ func (s *strictServer) ListTasks(
 	return api.ListTasks200JSONResponse(response), nil
 }
 
+func (s *strictServer) GetTask(
+	ctx context.Context,
+	request api.GetTaskRequestObject,
+) (api.GetTaskResponseObject, error) {
+	task, err := s.service.GetTask(ctx, request.Id)
+	if err != nil {
+		if errors.Is(err, domain.ErrTaskNotFound) {
+			return api.GetTask404JSONResponse(api.ErrorResponse{
+				Error: api.ErrorDetail{
+					Code:    "NOT_FOUND",
+					Message: "task not found",
+				},
+			}), nil
+		}
+
+		s.logger.Error("getting task", slog.String("task_id", request.Id), slog.Any("error", err))
+		return api.GetTask500JSONResponse(internalErrorResponse()), nil
+	}
+
+	return api.GetTask200JSONResponse(toAPITask(task)), nil
+}
+
 func (s *strictServer) CreateTask(
 	ctx context.Context,
 	request api.CreateTaskRequestObject,

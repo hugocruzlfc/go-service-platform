@@ -45,6 +45,26 @@ func (r *TaskRepository) Create(
 	return nil
 }
 
+// Get returns a task by ID.
+func (r *TaskRepository) Get(
+	ctx context.Context,
+	id string,
+) (domain.Task, error) {
+	if err := ctx.Err(); err != nil {
+		return domain.Task{}, err
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	task, exists := r.tasks[id]
+	if !exists {
+		return domain.Task{}, domain.ErrTaskNotFound
+	}
+
+	return task, nil
+}
+
 func (r *TaskRepository) List(
 	ctx context.Context,
 ) ([]domain.Task, error) {
