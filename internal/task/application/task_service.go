@@ -51,6 +51,23 @@ func (s *TaskService) CreateTask(
 	return task, nil
 }
 
+// DeleteTask removes a task by ID.
+func (s *TaskService) DeleteTask(
+	ctx context.Context,
+	id string,
+) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return domain.ErrTaskIDRequired
+	}
+
+	if err := s.repository.Delete(ctx, id); err != nil {
+		return fmt.Errorf("delete task: %w", err)
+	}
+
+	return nil
+}
+
 // GetTask returns a task by ID.
 func (s *TaskService) GetTask(
 	ctx context.Context,

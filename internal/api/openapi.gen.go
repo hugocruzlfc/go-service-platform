@@ -203,6 +203,11 @@ type ClientInterface interface {
 	// Corresponds with POST /tasks (the `CreateTask` operationId).
 	CreateTask(ctx context.Context, body CreateTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DeleteTask Delete a task
+	//
+	// Corresponds with DELETE /tasks/{id} (the `DeleteTask` operationId).
+	DeleteTask(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetTask Get a task
 	//
 	// Corresponds with GET /tasks/{id} (the `GetTask` operationId).
@@ -318,6 +323,21 @@ func (c *Client) CreateTaskWithBody(ctx context.Context, contentType string, bod
 // Corresponds with POST /tasks (the `CreateTask` operationId).
 func (c *Client) CreateTask(ctx context.Context, body CreateTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateTaskRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteTask Delete a task
+//
+// Corresponds with DELETE /tasks/{id} (the `DeleteTask` operationId).
+func (c *Client) DeleteTask(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteTaskRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -540,6 +560,40 @@ func NewCreateTaskRequestWithBody(server string, contentType string, body io.Rea
 	return req, nil
 }
 
+// NewDeleteTaskRequest constructs an http.Request for the DeleteTask method
+func NewDeleteTaskRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/tasks/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetTaskRequest constructs an http.Request for the GetTask method
 func NewGetTaskRequest(server string, id string) (*http.Request, error) {
 	var err error
@@ -739,6 +793,13 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /tasks (the `CreateTask` operationId).
 	CreateTaskWithResponse(ctx context.Context, body CreateTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTaskResponse, error)
+
+	// DeleteTaskWithResponse Delete a task
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /tasks/{id} (the `DeleteTask` operationId).
+	DeleteTaskWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteTaskResponse, error)
 
 	// GetTaskWithResponse Get a task
 	//
@@ -1002,6 +1063,54 @@ func (r CreateTaskResponse) ContentType() string {
 	return ""
 }
 
+type DeleteTaskResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DeleteTaskResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r DeleteTaskResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteTaskResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteTaskResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteTaskResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteTaskResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetTaskResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1244,6 +1353,19 @@ func (c *ClientWithResponses) CreateTaskWithResponse(ctx context.Context, body C
 	return ParseCreateTaskResponse(rsp)
 }
 
+// DeleteTaskWithResponse Delete a task
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /tasks/{id} (the `DeleteTask` operationId).
+func (c *ClientWithResponses) DeleteTaskWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteTaskResponse, error) {
+	rsp, err := c.DeleteTask(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteTaskResponse(rsp)
+}
+
 // GetTaskWithResponse Get a task
 //
 // Returns a wrapper object for the known response body format(s).
@@ -1454,6 +1576,42 @@ func ParseCreateTaskResponse(rsp *http.Response) (*CreateTaskResponse, error) {
 	return response, nil
 }
 
+// ParseDeleteTaskResponse parses an HTTP response from a DeleteTaskWithResponse call
+func ParseDeleteTaskResponse(rsp *http.Response) (*DeleteTaskResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteTaskResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetTaskResponse parses an HTTP response from a GetTaskWithResponse call
 func ParseGetTaskResponse(rsp *http.Response) (*GetTaskResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -1584,6 +1742,9 @@ type ServerInterface interface {
 	// CreateTask Create a task
 	// (POST /tasks)
 	CreateTask(w http.ResponseWriter, r *http.Request)
+	// DeleteTask Delete a task
+	// (DELETE /tasks/{id})
+	DeleteTask(w http.ResponseWriter, r *http.Request, id string)
 	// GetTask Get a task
 	// (GET /tasks/{id})
 	GetTask(w http.ResponseWriter, r *http.Request, id string)
@@ -1665,6 +1826,32 @@ func (siw *ServerInterfaceWrapper) CreateTask(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateTask(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteTask operation middleware
+func (siw *ServerInterfaceWrapper) DeleteTask(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteTask(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1866,6 +2053,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/version", wrapper.GetVersion)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tasks", wrapper.ListTasks)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tasks", wrapper.CreateTask)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/tasks/{id}", wrapper.DeleteTask)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tasks/{id}", wrapper.GetTask)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/tasks/{id}", wrapper.UpdateTask)
 
@@ -2034,6 +2222,50 @@ func (response CreateTask500JSONResponse) VisitCreateTaskResponse(w http.Respons
 	return err
 }
 
+type DeleteTaskRequestObject struct {
+	Id string `json:"id"`
+}
+
+type DeleteTaskResponseObject interface {
+	VisitDeleteTaskResponse(w http.ResponseWriter) error
+}
+
+type DeleteTask204Response struct {
+}
+
+func (response DeleteTask204Response) VisitDeleteTaskResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteTask404JSONResponse ErrorResponse
+
+func (response DeleteTask404JSONResponse) VisitDeleteTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteTask500JSONResponse ErrorResponse
+
+func (response DeleteTask500JSONResponse) VisitDeleteTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetTaskRequestObject struct {
 	Id string `json:"id"`
 }
@@ -2187,6 +2419,9 @@ type StrictServerInterface interface {
 	// CreateTask Create a task
 	// (POST /tasks)
 	CreateTask(ctx context.Context, request CreateTaskRequestObject) (CreateTaskResponseObject, error)
+	// DeleteTask Delete a task
+	// (DELETE /tasks/{id})
+	DeleteTask(ctx context.Context, request DeleteTaskRequestObject) (DeleteTaskResponseObject, error)
 	// GetTask Get a task
 	// (GET /tasks/{id})
 	GetTask(ctx context.Context, request GetTaskRequestObject) (GetTaskResponseObject, error)
@@ -2364,6 +2599,32 @@ func (sh *strictHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// DeleteTask operation middleware
+func (sh *strictHandler) DeleteTask(w http.ResponseWriter, r *http.Request, id string) {
+	var request DeleteTaskRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteTask(ctx, request.(DeleteTaskRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteTask")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteTaskResponseObject); ok {
+		if err := validResponse.VisitDeleteTaskResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetTask operation middleware
 func (sh *strictHandler) GetTask(w http.ResponseWriter, r *http.Request, id string) {
 	var request GetTaskRequestObject
@@ -2452,28 +2713,28 @@ func (sh *strictHandler) GetVersion(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"7FhRb9s2EP4rBLdH1XbaDij01qVbG6wbgjRdH4Y8nMWzxVYiVfKU1A3834cjJUu2ZLtF0zQY9uZW5PG7",
-	"7777jsytzGxZWYOGvExvpc9yLCH8PHUIhJfgP1zgxxo98X+CUpq0NVCcO1uhI41epgsoPCZSoc+crvi7",
-	"TOU5rAoLStQelSArshBPgCDwHyYykVUvwq0kTQXyj+0ofL4I3ybiXa4JfQUZCu0FOV2WqMR8JShH4dFd",
-	"6ww5cAmfXqNZUi7Tk8ezRNKqQplKT06bpVyvE+nwY60dKpn+0xx8tVlm5+8xI7lO5G/OWfcCCXQxBPYn",
-	"ZLk2+MghKJgXKJBXC20W1pXAi4RDqp3pIGa1c2hIPD8/G+afWTWS/hsKsaGqCp3FqPEcXj6RG9Btboks",
-	"0XtYjoWCBYq8LsHsYm62TOQxqgLG7oi9nF2gr6zxIyDCZ+Ga71/HUADLP352uJCp/GnaaXfaCHfar9ku",
-	"/BhgDPUrhILy/bDfRHGJPKwTnoBqL8CoLhXSJXqCshoCj8uHUU+bbLeijhaVgw/3v7087Y4VQOIm11ke",
-	"iNzAugEvlmjQAaHi2FGeMpUKCB+FwMfK3uBvYIzxx106xPc8tLoowcBytFF3O6CsCiRUw0jvcqQcXdgf",
-	"YubgxRzRiM2mHm9zawsEw8Ci6ajn9FXshSOYuWb7l/KWSD0C/q3RH+smqFZoSC80uj11HjfBxuqoM8Oj",
-	"RdNKtvGSHrV9SsYq+bZS3+T6v2sslBeUA4kMjJijyHIwXH9rBBiBn7QnbZabMVBq04968hWy+AtvWgGw",
-	"M7JOUSxsp5NxUexhmaPRdxk3A5b/Rue1NfsNp7WG5hhxHTcMm6b5MGZZJRjSWbtV2MUu8MMCaiMPVcIr",
-	"ec4ND311eXnO5h2KEPq+rXTrlpV1ofp+y1EnG62m8qUVrd2eF0DcdxxSJl2u8mQym8yYSFuhgUrLVD6Z",
-	"zCZPmB6gPDAzjaH55xJH+v8izB4vQPg6y9D7RV30fDPXBfYJE5WzvIq14GpjtFkyaq5FmMtnirEjxVEi",
-	"E9mGCmAez2ZRy4bQxJ7qRvr0vY8VjEPs2IjbGVahHOPjSnsBhb7GSSiur8sS3IrVlWP2YZMYrzDog8HD",
-	"0nPtG+queFvD4+e9RP5Rz9EZJPSPPK34tlJo8Js+jNsFGlVZbegAaZ//S6zxHWv1+aj6bnqTrQ3Nvukw",
-	"Q32NghwsFjobZe0CQekGw8PgLSQ94cb8ZfbkziBs3ykPIzCWNigOVM/1qBstX/CsXvW2yX+tPV2GFd/I",
-	"vCYs/bH8+STZjRFwDlZjNAREwjqFLg6qsxdNLWb3V4szQ+gMFIFqdPGJsVsM5i+OhR7/8d9X60RW1o+Q",
-	"3j1IZZxU6OlXq1Z3ltvwxbveHorkalwPKn5yZwBioccL291F14l8er8VvYZC8/AOpIi5VSvB5t67jT5I",
-	"lZ32/+IwIrRNn09vtVrvbfaXSI3oKnBQIqHjMF9+zdf8me8lMpEGSpRpvJ1vCyvpcbN7M7v6jgZ/UHQL",
-	"W5tWck/vr7zhbLby7vyHJ6+XSPu1FS6iWT5UU/fA+uGCunsHHb4ev8hB70nMdUD3Ax00AmiN9P+2Gm2r",
-	"qKHDrt179e6z7OaJ/T2vxruv+JGM977jh1ays6SXuV95wpJT502BujG/eG0zKITCayxsVbanopOJrF0h",
-	"U5kTVel0WvC63HpKn82ezeT6av3vAA==",
+	"7FhBb9s4E/0rBL/vqNpO2wUK3brpbhtsdxGk6fawyGEsji22EqmSo6Ru4P++GFKyZEu2WzRNg0VvTkQO",
+	"37z3ZobSrcxsWVmDhrxMb6XPciwh/Dx1CISX4D9c4McaPfE/QSlN2hoozp2t0JFGL9MFFB4TqdBnTlf8",
+	"XKbyHFaFBSVqj0qQFVmIJ0AQ+A8TmciqF+FWkqYC+cd2FD5fhGcT8S7XhL6CDIX2gpwuS1RivhKUo/Do",
+	"rnWGHLiET6/RLCmX6cnjWSJpVaFMpSenzVKu14l0+LHWDpVM/2kOvtoss/P3mJFcJ/I356x7gQS6GAL7",
+	"E7JcG3zkEBTMCxTIq4U2C+tK4EXCIdXOdBCz2jk0JJ6fnw3zz6waSf8NhdhQVYXOYtR4Di+fyA3oNrdE",
+	"lug9LMdCwQJFXpdgdjE3WybyGFUBY3fEXs4u0FfW+BEQ4bFwzfOvYyiA5R//d7iQqfzftPPutDHutK/Z",
+	"LvwYYAz1K4SC8v2w30RziTysE56Aai/AqC4V0iV6grIaAo/Lh1FPm2y3oo6KysGH+99ennbHCiBxk+ss",
+	"D0RuYN2AF0s06IBQcexoT5lKBYSPQuBjsjf4Gxhj/HGVDvE9D6UuSjCwHC3U3QooqwIJ1TDSuxwpRxf2",
+	"h5g5eDFHNGKzqcfb3NoCwTCw2HTUc/oq9sIRzFyz/Ut5S6QeAf/W6I91E1QrNKQXGt0encebYNPqqGuG",
+	"R0XTSrbxkh61fUrGlHxbqW/q+r9rLJQXlAOJDIyYo8hyMKy/NQKMwE/akzbLzRgotelHPfkKW/yFN60B",
+	"uDOyT1EsbOeTcVPsYZmj0XcZNwOW/0bntTX7G07bGppjxHXcMCya5sFYyyrBkM7arcIudoEfNlAbeegS",
+	"Xslzbnjoq8vLc27eQYRQ963SbbesrAvq+62OOtl4NZUvrWjb7XkBxHXHIWXS5SpPJrPJjIm0FRqotEzl",
+	"k8ls8oTpAcoDM9MYmn8ucaT+L8Ls8QKEr7MMvV/URa9v5rrAPmGicpZXsRdcbYw2S0bNWoS5fKYYO1Ic",
+	"JTKRbagA5vFsFr1sCE2sqW6kT9/7qGAcYsdG3M6wCnKMjyvtBRT6GidBXF+XJbgVuyvH7MMmMV5h0IcG",
+	"D0vP2jfUXfG2hsfPe4n8o56jM0joH3la8W2l0OA3dRi3CzSqstrQAdI+/5dY4zvW6vNR9930Jlsbmvum",
+	"wwz1NQpysFjobJS1CwSlGwwPg7eQ9IQL85fZkzuDsH2nPIzAWNqgOKCe61E3Kl/oWT31tsl/rT1dhhXf",
+	"yLwmLP2x/Pkk2Y0RcA5WYzQERMI6hS4OqrMXjRaz+9PizBA6A0WgGl18xdgVg/mLY6HHf/z7ap3IyvoR",
+	"0rsXUhknFXr61arVneU2fONdbw9FcjWuB4qf3BmAKPS4sN1ddJ3Ip/er6DUUmod3IEXMrVoJbu692+iD",
+	"dNlp/4vDiNE2dT691Wode3SBhEPrvQj/b6xXgYMSCR0H+/LLvubHfDuRiTRQokzjHX3bXkmPod372dXA",
+	"ek/3fDCJebReeXp/uoTTuQcvbG3UA/VFVHO/L5Lxpv8S6eE5YHY/zaeT86eddu30EumQlyqgLB+6qXvR",
+	"/uGGuvtJOvyK8EWT9J7MXAd0P3CSRgDtQP1ZVqNlFT10eHr3vn7sa9nNp5bv+Yq0+zVnJOO933OGrWRn",
+	"SS9zv/KEJafOmwJ1Y/3itc2gEAqvsbBV2Z6KTiaydoVMZU5UpdNpwety6yl9Nns2k+ur9b8DAA==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

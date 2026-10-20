@@ -49,6 +49,24 @@ func (r *TaskRepository) Create(
 	return nil
 }
 
+// Delete removes a task by ID.
+func (r *TaskRepository) Delete(
+	ctx context.Context,
+	id string,
+) error {
+	const query = `DELETE FROM tasks WHERE id = $1`
+
+	result, err := r.pool.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("delete task: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return domain.ErrTaskNotFound
+	}
+
+	return nil
+}
+
 // Get returns a task by ID.
 func (r *TaskRepository) Get(
 	ctx context.Context,

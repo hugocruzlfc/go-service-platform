@@ -14,6 +14,7 @@ type fakeTaskRepository struct {
 	gottenTasks  map[string]domain.Task
 	listedTasks  []domain.Task
 	createErr    error
+	deleteErr    error
 	getErr       error
 	updateErr    error
 	listErr      error
@@ -52,6 +53,13 @@ func (r *fakeTaskRepository) Get(
 	}
 
 	return task, nil
+}
+
+func (r *fakeTaskRepository) Delete(
+	ctx context.Context,
+	id string,
+) error {
+	return r.deleteErr
 }
 
 func (r *fakeTaskRepository) Update(
@@ -211,6 +219,26 @@ func TestTaskServiceUpdateTaskRejectsEmptyUpdate(t *testing.T) {
 
 	if !errors.Is(err, domain.ErrTaskUpdateEmpty) {
 		t.Errorf("expected domain.ErrTaskUpdateEmpty, got %v", err)
+	}
+}
+
+func TestTaskServiceDeleteTask(t *testing.T) {
+	repository := &fakeTaskRepository{}
+	service := NewTaskService(repository)
+
+	if err := service.DeleteTask(t.Context(), "task-1"); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
+func TestTaskServiceDeleteTaskWrapsRepositoryError(t *testing.T) {
+	repositoryError := errors.New("repository unavailable")
+	service := NewTaskService(&fakeTaskRepository{deleteErr: repositoryError})
+
+	err := service.DeleteTask(t.Context(), "task-1")
+
+	if !errors.Is(err, repositoryError) {
+		t.Errorf("expected wrapped repository error, got %v", err)
 	}
 }
 

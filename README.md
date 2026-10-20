@@ -226,6 +226,20 @@ List tasks again:
 curl --fail --silent http://localhost:8080/tasks
 ```
 
+Get, update, and delete a task using its returned ID:
+
+```bash
+curl --fail --silent http://localhost:8080/tasks/<task-id>
+
+curl --fail --silent \
+  -X PATCH http://localhost:8080/tasks/<task-id> \
+  -H 'Content-Type: application/json' \
+  -d '{"completed":true}'
+
+curl --fail --silent --request DELETE \
+  http://localhost:8080/tasks/<task-id>
+```
+
 ### 5. Run tests
 
 The normal test suite does not require Docker:

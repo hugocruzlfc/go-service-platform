@@ -104,6 +104,35 @@ func TestTaskRepositoryGetReturnsNotFound(t *testing.T) {
 	}
 }
 
+func TestTaskRepositoryDelete(t *testing.T) {
+	repository := NewTaskRepository()
+	ctx := t.Context()
+	task, err := domain.NewTask("task-1", "Learn Go", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.Create(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := repository.Delete(ctx, task.ID); err != nil {
+		t.Fatalf("deleting task: %v", err)
+	}
+	if _, err := repository.Get(ctx, task.ID); !errors.Is(err, domain.ErrTaskNotFound) {
+		t.Errorf("expected task to be deleted, got %v", err)
+	}
+}
+
+func TestTaskRepositoryDeleteReturnsNotFound(t *testing.T) {
+	repository := NewTaskRepository()
+
+	err := repository.Delete(t.Context(), "missing")
+
+	if !errors.Is(err, domain.ErrTaskNotFound) {
+		t.Errorf("expected domain.ErrTaskNotFound, got %v", err)
+	}
+}
+
 func TestTaskRepositoryUpdate(t *testing.T) {
 	repository := NewTaskRepository()
 	ctx := t.Context()

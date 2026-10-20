@@ -152,6 +152,36 @@ func (s *strictServer) UpdateTask(
 	return api.UpdateTask200JSONResponse(toAPITask(task)), nil
 }
 
+func (s *strictServer) DeleteTask(
+	ctx context.Context,
+	request api.DeleteTaskRequestObject,
+) (api.DeleteTaskResponseObject, error) {
+	if err := s.service.DeleteTask(ctx, request.Id); err != nil {
+		if errors.Is(err, domain.ErrTaskNotFound) {
+			return api.DeleteTask404JSONResponse(api.ErrorResponse{
+				Error: api.ErrorDetail{
+					Code:    "NOT_FOUND",
+					Message: "task not found",
+				},
+			}), nil
+		}
+
+		if errors.Is(err, domain.ErrTaskIDRequired) {
+			return api.DeleteTask404JSONResponse(api.ErrorResponse{
+				Error: api.ErrorDetail{
+					Code:    "NOT_FOUND",
+					Message: "task not found",
+				},
+			}), nil
+		}
+
+		s.logger.Error("deleting task", slog.String("task_id", request.Id), slog.Any("error", err))
+		return api.DeleteTask500JSONResponse(internalErrorResponse()), nil
+	}
+
+	return api.DeleteTask204Response{}, nil
+}
+
 func (s *strictServer) CreateTask(
 	ctx context.Context,
 	request api.CreateTaskRequestObject,

@@ -26,6 +26,13 @@ func (r failingTaskRepository) Create(
 	return r.err
 }
 
+func (r failingTaskRepository) Delete(
+	ctx context.Context,
+	id string,
+) error {
+	return r.err
+}
+
 func (r failingTaskRepository) Get(
 	ctx context.Context,
 	id string,
@@ -216,6 +223,49 @@ func TestUpdateTaskRouteRejectsEmptyUpdate(t *testing.T) {
 	assertErrorResponse(t, rec, http.StatusBadRequest, "VALIDATION_ERROR", "task update must contain at least one field")
 }
 
+func TestDeleteTaskRoute(t *testing.T) {
+	router := newTestRouter()
+
+	createRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/tasks",
+		bytes.NewBufferString(`{"title":"Learn Go"}`),
+	)
+	createRecorder := httptest.NewRecorder()
+	router.ServeHTTP(createRecorder, createRequest)
+
+	var createdTask domain.Task
+	if err := json.NewDecoder(createRecorder.Body).Decode(&createdTask); err != nil {
+		t.Fatalf("decoding created task: %v", err)
+	}
+
+	deleteRequest := httptest.NewRequest(http.MethodDelete, "/tasks/"+createdTask.ID, nil)
+	deleteRecorder := httptest.NewRecorder()
+	router.ServeHTTP(deleteRecorder, deleteRequest)
+
+	if deleteRecorder.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d", http.StatusNoContent, deleteRecorder.Code)
+	}
+	if deleteRecorder.Body.Len() != 0 {
+		t.Errorf("expected empty response body, got %q", deleteRecorder.Body.String())
+	}
+
+	getRequest := httptest.NewRequest(http.MethodGet, "/tasks/"+createdTask.ID, nil)
+	getRecorder := httptest.NewRecorder()
+	router.ServeHTTP(getRecorder, getRequest)
+	assertErrorResponse(t, getRecorder, http.StatusNotFound, "NOT_FOUND", "task not found")
+}
+
+func TestDeleteTaskRouteReturnsNotFound(t *testing.T) {
+	router := newTestRouter()
+	req := httptest.NewRequest(http.MethodDelete, "/tasks/missing", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusNotFound, "NOT_FOUND", "task not found")
+}
+
 func TestCreateTaskRouteRejectsInvalidJSON(t *testing.T) {
 	router := newTestRouter()
 
@@ -316,6 +366,15 @@ func TestTaskRoutesHideRepositoryErrors(t *testing.T) {
 
 	t.Run("update", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPatch, "/tasks/task-1", bytes.NewBufferString(`{"completed":true}`))
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		assertErrorResponse(t, rec, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+	})
+
+	t.Run("delete", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodDelete, "/tasks/task-1", nil)
 		rec := httptest.NewRecorder()
 
 		router.ServeHTTP(rec, req)

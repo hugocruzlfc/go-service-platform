@@ -45,6 +45,26 @@ func (r *TaskRepository) Create(
 	return nil
 }
 
+// Delete removes a task by ID.
+func (r *TaskRepository) Delete(
+	ctx context.Context,
+	id string,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, exists := r.tasks[id]; !exists {
+		return domain.ErrTaskNotFound
+	}
+
+	delete(r.tasks, id)
+	return nil
+}
+
 // Get returns a task by ID.
 func (r *TaskRepository) Get(
 	ctx context.Context,
