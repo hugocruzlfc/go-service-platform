@@ -30,7 +30,7 @@ const swaggerUIHTML = `<!doctype html>
 
 func openAPIHandler(logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		spec, err := api.GetSwagger()
+		spec, err := api.GetSpec()
 		if err != nil {
 			logger.Error("loading OpenAPI specification", slog.Any("error", err))
 			writeError(logger, w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
