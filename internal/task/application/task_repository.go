@@ -10,5 +10,6 @@ import (
 type TaskRepository interface {
 	Create(ctx context.Context, task domain.Task) error
 	Get(ctx context.Context, id string) (domain.Task, error)
+	Update(ctx context.Context, task domain.Task) error
 	List(ctx context.Context) ([]domain.Task, error)
 }

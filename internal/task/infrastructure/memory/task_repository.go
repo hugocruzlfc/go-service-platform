@@ -65,6 +65,26 @@ func (r *TaskRepository) Get(
 	return task, nil
 }
 
+// Update replaces an existing task.
+func (r *TaskRepository) Update(
+	ctx context.Context,
+	task domain.Task,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, exists := r.tasks[task.ID]; !exists {
+		return domain.ErrTaskNotFound
+	}
+
+	r.tasks[task.ID] = task
+	return nil
+}
+
 func (r *TaskRepository) List(
 	ctx context.Context,
 ) ([]domain.Task, error) {

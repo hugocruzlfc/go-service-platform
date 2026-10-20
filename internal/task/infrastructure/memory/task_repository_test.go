@@ -104,6 +104,42 @@ func TestTaskRepositoryGetReturnsNotFound(t *testing.T) {
 	}
 }
 
+func TestTaskRepositoryUpdate(t *testing.T) {
+	repository := NewTaskRepository()
+	ctx := t.Context()
+	task, err := domain.NewTask("task-1", "Learn Go", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.Create(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+
+	task.Title = "Build APIs"
+	task.Completed = true
+	if err := repository.Update(ctx, task); err != nil {
+		t.Fatalf("updating task: %v", err)
+	}
+
+	updated, err := repository.Get(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("getting updated task: %v", err)
+	}
+	if updated != task {
+		t.Errorf("expected task %#v, got %#v", task, updated)
+	}
+}
+
+func TestTaskRepositoryUpdateReturnsNotFound(t *testing.T) {
+	repository := NewTaskRepository()
+
+	err := repository.Update(t.Context(), domain.Task{ID: "missing"})
+
+	if !errors.Is(err, domain.ErrTaskNotFound) {
+		t.Errorf("expected domain.ErrTaskNotFound, got %v", err)
+	}
+}
+
 func TestTaskRepositoryRejectsCancelledContext(t *testing.T) {
 	repository := NewTaskRepository()
 

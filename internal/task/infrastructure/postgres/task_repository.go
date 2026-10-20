@@ -78,6 +78,28 @@ func (r *TaskRepository) Get(
 	return task, nil
 }
 
+// Update replaces an existing task.
+func (r *TaskRepository) Update(
+	ctx context.Context,
+	task domain.Task,
+) error {
+	const query = `
+		UPDATE tasks
+		SET title = $2, completed = $3
+		WHERE id = $1
+	`
+
+	result, err := r.pool.Exec(ctx, query, task.ID, task.Title, task.Completed)
+	if err != nil {
+		return fmt.Errorf("update task: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return domain.ErrTaskNotFound
+	}
+
+	return nil
+}
+
 func (r *TaskRepository) List(
 	ctx context.Context,
 ) ([]domain.Task, error) {

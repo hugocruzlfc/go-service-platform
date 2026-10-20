@@ -45,6 +45,8 @@ func validationErrorMessage(err error) string {
 		return "task title is required"
 	case errors.Is(err, domain.ErrTaskTitleTooLong):
 		return "task title must not exceed 120 characters"
+	case errors.Is(err, domain.ErrTaskUpdateEmpty):
+		return "task update must contain at least one field"
 	default:
 		return "invalid task"
 	}

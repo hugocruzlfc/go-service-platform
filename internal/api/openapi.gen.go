@@ -68,6 +68,15 @@ type Task struct {
 	Title string `json:"title"`
 }
 
+// UpdateTaskRequest Fields that can be changed on an existing task.
+type UpdateTaskRequest struct {
+	// Completed New completion state for the task.
+	Completed *bool `json:"completed,omitempty"`
+
+	// Title New task title. Whitespace is trimmed by the service.
+	Title *string `json:"title,omitempty"`
+}
+
 // VersionResponse Current service version.
 type VersionResponse struct {
 	// Version Semantic version of the service.
@@ -76,6 +85,9 @@ type VersionResponse struct {
 
 // CreateTaskJSONRequestBody defines body for CreateTask for application/json ContentType.
 type CreateTaskJSONRequestBody = CreateTaskRequest
+
+// UpdateTaskJSONRequestBody defines body for UpdateTask for application/json ContentType.
+type UpdateTaskJSONRequestBody = UpdateTaskRequest
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -196,6 +208,20 @@ type ClientInterface interface {
 	// Corresponds with GET /tasks/{id} (the `GetTask` operationId).
 	GetTask(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// UpdateTaskWithBody Update a task
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /tasks/{id} (the `UpdateTask` operationId).
+	UpdateTaskWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateTask Update a task
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /tasks/{id} (the `UpdateTask` operationId).
+	UpdateTask(ctx context.Context, id string, body UpdateTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetVersion Get service version
 	//
 	// Corresponds with GET /version (the `GetVersion` operationId).
@@ -307,6 +333,40 @@ func (c *Client) CreateTask(ctx context.Context, body CreateTaskJSONRequestBody,
 // Corresponds with GET /tasks/{id} (the `GetTask` operationId).
 func (c *Client) GetTask(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetTaskRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateTaskWithBody Update a task
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /tasks/{id} (the `UpdateTask` operationId).
+func (c *Client) UpdateTaskWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateTaskRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateTask Update a task
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /tasks/{id} (the `UpdateTask` operationId).
+func (c *Client) UpdateTask(ctx context.Context, id string, body UpdateTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateTaskRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -514,6 +574,53 @@ func NewGetTaskRequest(server string, id string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewUpdateTaskRequest calls the generic UpdateTask builder with application/json body
+func NewUpdateTaskRequest(server string, id string, body UpdateTaskJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateTaskRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewUpdateTaskRequestWithBody constructs an http.Request for the UpdateTask method, with any body, and a specified content type
+func NewUpdateTaskRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/tasks/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewGetVersionRequest constructs an http.Request for the GetVersion method
 func NewGetVersionRequest(server string) (*http.Request, error) {
 	var err error
@@ -639,6 +746,20 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /tasks/{id} (the `GetTask` operationId).
 	GetTaskWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetTaskResponse, error)
+
+	// UpdateTaskWithBodyWithResponse Update a task
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /tasks/{id} (the `UpdateTask` operationId).
+	UpdateTaskWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTaskResponse, error)
+
+	// UpdateTaskWithResponse Update a task
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /tasks/{id} (the `UpdateTask` operationId).
+	UpdateTaskWithResponse(ctx context.Context, id string, body UpdateTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTaskResponse, error)
 
 	// GetVersionWithResponse Get service version
 	//
@@ -936,6 +1057,68 @@ func (r GetTaskResponse) ContentType() string {
 	return ""
 }
 
+type UpdateTaskResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Task
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateTaskResponse) GetJSON200() *Task {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r UpdateTaskResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r UpdateTaskResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r UpdateTaskResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateTaskResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateTaskResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateTaskResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateTaskResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetVersionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1072,6 +1255,32 @@ func (c *ClientWithResponses) GetTaskWithResponse(ctx context.Context, id string
 		return nil, err
 	}
 	return ParseGetTaskResponse(rsp)
+}
+
+// UpdateTaskWithBodyWithResponse Update a task
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /tasks/{id} (the `UpdateTask` operationId).
+func (c *ClientWithResponses) UpdateTaskWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTaskResponse, error) {
+	rsp, err := c.UpdateTaskWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateTaskResponse(rsp)
+}
+
+// UpdateTaskWithResponse Update a task
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /tasks/{id} (the `UpdateTask` operationId).
+func (c *ClientWithResponses) UpdateTaskWithResponse(ctx context.Context, id string, body UpdateTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTaskResponse, error) {
+	rsp, err := c.UpdateTask(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateTaskResponse(rsp)
 }
 
 // GetVersionWithResponse Get service version
@@ -1285,6 +1494,53 @@ func ParseGetTaskResponse(rsp *http.Response) (*GetTaskResponse, error) {
 	return response, nil
 }
 
+// ParseUpdateTaskResponse parses an HTTP response from a UpdateTaskWithResponse call
+func ParseUpdateTaskResponse(rsp *http.Response) (*UpdateTaskResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateTaskResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Task
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetVersionResponse parses an HTTP response from a GetVersionWithResponse call
 func ParseGetVersionResponse(rsp *http.Response) (*GetVersionResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -1331,6 +1587,9 @@ type ServerInterface interface {
 	// GetTask Get a task
 	// (GET /tasks/{id})
 	GetTask(w http.ResponseWriter, r *http.Request, id string)
+	// UpdateTask Update a task
+	// (PATCH /tasks/{id})
+	UpdateTask(w http.ResponseWriter, r *http.Request, id string)
 	// GetVersion Get service version
 	// (GET /version)
 	GetVersion(w http.ResponseWriter, r *http.Request)
@@ -1432,6 +1691,32 @@ func (siw *ServerInterfaceWrapper) GetTask(w http.ResponseWriter, r *http.Reques
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetTask(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateTask operation middleware
+func (siw *ServerInterfaceWrapper) UpdateTask(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateTask(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1582,6 +1867,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tasks", wrapper.ListTasks)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tasks", wrapper.CreateTask)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tasks/{id}", wrapper.GetTask)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/tasks/{id}", wrapper.UpdateTask)
 
 	return m
 }
@@ -1798,6 +2084,71 @@ func (response GetTask500JSONResponse) VisitGetTaskResponse(w http.ResponseWrite
 	return err
 }
 
+type UpdateTaskRequestObject struct {
+	Id   string `json:"id"`
+	Body *UpdateTaskJSONRequestBody
+}
+
+type UpdateTaskResponseObject interface {
+	VisitUpdateTaskResponse(w http.ResponseWriter) error
+}
+
+type UpdateTask200JSONResponse Task
+
+func (response UpdateTask200JSONResponse) VisitUpdateTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTask400JSONResponse ErrorResponse
+
+func (response UpdateTask400JSONResponse) VisitUpdateTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTask404JSONResponse ErrorResponse
+
+func (response UpdateTask404JSONResponse) VisitUpdateTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTask500JSONResponse ErrorResponse
+
+func (response UpdateTask500JSONResponse) VisitUpdateTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetVersionRequestObject struct {
 }
 
@@ -1839,6 +2190,9 @@ type StrictServerInterface interface {
 	// GetTask Get a task
 	// (GET /tasks/{id})
 	GetTask(ctx context.Context, request GetTaskRequestObject) (GetTaskResponseObject, error)
+	// UpdateTask Update a task
+	// (PATCH /tasks/{id})
+	UpdateTask(ctx context.Context, request UpdateTaskRequestObject) (UpdateTaskResponseObject, error)
 	// GetVersion Get service version
 	// (GET /version)
 	GetVersion(ctx context.Context, request GetVersionRequestObject) (GetVersionResponseObject, error)
@@ -2036,6 +2390,39 @@ func (sh *strictHandler) GetTask(w http.ResponseWriter, r *http.Request, id stri
 	}
 }
 
+// UpdateTask operation middleware
+func (sh *strictHandler) UpdateTask(w http.ResponseWriter, r *http.Request, id string) {
+	var request UpdateTaskRequestObject
+
+	request.Id = id
+
+	var body UpdateTaskJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateTask(ctx, request.(UpdateTaskRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateTask")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateTaskResponseObject); ok {
+		if err := validResponse.VisitUpdateTaskResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetVersion operation middleware
 func (sh *strictHandler) GetVersion(w http.ResponseWriter, r *http.Request) {
 	var request GetVersionRequestObject
@@ -2065,26 +2452,28 @@ func (sh *strictHandler) GetVersion(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"U5kTVel0WvC63HpKn82ezeT6av3vAA==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

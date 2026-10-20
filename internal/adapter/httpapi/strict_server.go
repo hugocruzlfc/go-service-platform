@@ -111,6 +111,47 @@ func (s *strictServer) GetTask(
 	return api.GetTask200JSONResponse(toAPITask(task)), nil
 }
 
+func (s *strictServer) UpdateTask(
+	ctx context.Context,
+	request api.UpdateTaskRequestObject,
+) (api.UpdateTaskResponseObject, error) {
+	if request.Body == nil {
+		return api.UpdateTask400JSONResponse(invalidRequestResponse()), nil
+	}
+
+	task, err := s.service.UpdateTask(ctx, request.Id, application.TaskUpdate{
+		Title:     request.Body.Title,
+		Completed: request.Body.Completed,
+	})
+	if err != nil {
+		if errors.Is(err, domain.ErrTaskNotFound) {
+			return api.UpdateTask404JSONResponse(api.ErrorResponse{
+				Error: api.ErrorDetail{
+					Code:    "NOT_FOUND",
+					Message: "task not found",
+				},
+			}), nil
+		}
+
+		if errors.Is(err, domain.ErrTaskIDRequired) ||
+			errors.Is(err, domain.ErrTaskUpdateEmpty) ||
+			errors.Is(err, domain.ErrTaskTitleRequired) ||
+			errors.Is(err, domain.ErrTaskTitleTooLong) {
+			return api.UpdateTask400JSONResponse(api.ErrorResponse{
+				Error: api.ErrorDetail{
+					Code:    "VALIDATION_ERROR",
+					Message: validationErrorMessage(err),
+				},
+			}), nil
+		}
+
+		s.logger.Error("updating task", slog.String("task_id", request.Id), slog.Any("error", err))
+		return api.UpdateTask500JSONResponse(internalErrorResponse()), nil
+	}
+
+	return api.UpdateTask200JSONResponse(toAPITask(task)), nil
+}
+
 func (s *strictServer) CreateTask(
 	ctx context.Context,
 	request api.CreateTaskRequestObject,

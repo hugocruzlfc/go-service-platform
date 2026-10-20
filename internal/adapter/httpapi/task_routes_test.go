@@ -33,6 +33,13 @@ func (r failingTaskRepository) Get(
 	return domain.Task{}, r.err
 }
 
+func (r failingTaskRepository) Update(
+	ctx context.Context,
+	task domain.Task,
+) error {
+	return r.err
+}
+
 func (r failingTaskRepository) List(
 	ctx context.Context,
 ) ([]domain.Task, error) {
@@ -159,6 +166,56 @@ func TestGetTaskRouteReturnsNotFound(t *testing.T) {
 	assertErrorResponse(t, rec, http.StatusNotFound, "NOT_FOUND", "task not found")
 }
 
+func TestUpdateTaskRoute(t *testing.T) {
+	router := newTestRouter()
+
+	createRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/tasks",
+		bytes.NewBufferString(`{"title":"Learn Go"}`),
+	)
+	createRecorder := httptest.NewRecorder()
+	router.ServeHTTP(createRecorder, createRequest)
+
+	var createdTask domain.Task
+	if err := json.NewDecoder(createRecorder.Body).Decode(&createdTask); err != nil {
+		t.Fatalf("decoding created task: %v", err)
+	}
+
+	updateRequest := httptest.NewRequest(
+		http.MethodPatch,
+		"/tasks/"+createdTask.ID,
+		bytes.NewBufferString(`{"completed":true}`),
+	)
+	updateRecorder := httptest.NewRecorder()
+	router.ServeHTTP(updateRecorder, updateRequest)
+
+	if updateRecorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, updateRecorder.Code)
+	}
+
+	var updatedTask domain.Task
+	if err := json.NewDecoder(updateRecorder.Body).Decode(&updatedTask); err != nil {
+		t.Fatalf("decoding updated task: %v", err)
+	}
+	if !updatedTask.Completed {
+		t.Error("expected task to be completed")
+	}
+	if updatedTask.Title != createdTask.Title {
+		t.Errorf("expected title %q, got %q", createdTask.Title, updatedTask.Title)
+	}
+}
+
+func TestUpdateTaskRouteRejectsEmptyUpdate(t *testing.T) {
+	router := newTestRouter()
+	req := httptest.NewRequest(http.MethodPatch, "/tasks/task-1", bytes.NewBufferString(`{}`))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "VALIDATION_ERROR", "task update must contain at least one field")
+}
+
 func TestCreateTaskRouteRejectsInvalidJSON(t *testing.T) {
 	router := newTestRouter()
 
@@ -250,6 +307,15 @@ func TestTaskRoutesHideRepositoryErrors(t *testing.T) {
 
 	t.Run("get", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/tasks/task-1", nil)
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		assertErrorResponse(t, rec, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+	})
+
+	t.Run("update", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPatch, "/tasks/task-1", bytes.NewBufferString(`{"completed":true}`))
 		rec := httptest.NewRecorder()
 
 		router.ServeHTTP(rec, req)

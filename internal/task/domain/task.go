@@ -12,6 +12,7 @@ var (
 	ErrTaskTitleRequired = errors.New("task title is required")
 	ErrTaskTitleTooLong  = errors.New("task title must not exceed 120 characters")
 	ErrTaskNotFound      = errors.New("task not found")
+	ErrTaskUpdateEmpty   = errors.New("task update must contain at least one field")
 )
 
 // Task represents a task managed by the service.
@@ -45,4 +46,29 @@ func NewTask(id, title string, createdAt time.Time) (Task, error) {
 		Completed: false,
 		CreatedAt: createdAt.UTC(),
 	}, nil
+}
+
+// Update applies the provided changes while preserving the task identity and creation time.
+func (t *Task) Update(title *string, completed *bool) error {
+	if title == nil && completed == nil {
+		return ErrTaskUpdateEmpty
+	}
+
+	if title != nil {
+		normalizedTitle := strings.TrimSpace(*title)
+		if normalizedTitle == "" {
+			return ErrTaskTitleRequired
+		}
+		if len([]rune(normalizedTitle)) > 120 {
+			return ErrTaskTitleTooLong
+		}
+
+		t.Title = normalizedTitle
+	}
+
+	if completed != nil {
+		t.Completed = *completed
+	}
+
+	return nil
 }

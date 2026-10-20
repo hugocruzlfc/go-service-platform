@@ -16,6 +16,12 @@ type TaskService struct {
 	repository TaskRepository
 }
 
+// TaskUpdate contains the optional fields that can be changed on a task.
+type TaskUpdate struct {
+	Title     *string
+	Completed *bool
+}
+
 // NewTaskService creates a task service using repository as its persistence dependency.
 func NewTaskService(repository TaskRepository) *TaskService {
 	return &TaskService{
@@ -58,6 +64,33 @@ func (s *TaskService) GetTask(
 	task, err := s.repository.Get(ctx, id)
 	if err != nil {
 		return domain.Task{}, fmt.Errorf("get task: %w", err)
+	}
+
+	return task, nil
+}
+
+// UpdateTask applies changes to an existing task.
+func (s *TaskService) UpdateTask(
+	ctx context.Context,
+	id string,
+	update TaskUpdate,
+) (domain.Task, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return domain.Task{}, domain.ErrTaskIDRequired
+	}
+
+	task, err := s.repository.Get(ctx, id)
+	if err != nil {
+		return domain.Task{}, fmt.Errorf("get task for update: %w", err)
+	}
+
+	if err := task.Update(update.Title, update.Completed); err != nil {
+		return domain.Task{}, err
+	}
+
+	if err := s.repository.Update(ctx, task); err != nil {
+		return domain.Task{}, fmt.Errorf("update task: %w", err)
 	}
 
 	return task, nil

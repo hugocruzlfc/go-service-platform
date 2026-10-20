@@ -15,6 +15,7 @@ type fakeTaskRepository struct {
 	listedTasks  []domain.Task
 	createErr    error
 	getErr       error
+	updateErr    error
 	listErr      error
 	createCtx    context.Context
 	getCtx       context.Context
@@ -51,6 +52,21 @@ func (r *fakeTaskRepository) Get(
 	}
 
 	return task, nil
+}
+
+func (r *fakeTaskRepository) Update(
+	ctx context.Context,
+	task domain.Task,
+) error {
+	if r.updateErr != nil {
+		return r.updateErr
+	}
+
+	if r.gottenTasks == nil {
+		r.gottenTasks = make(map[string]domain.Task)
+	}
+	r.gottenTasks[task.ID] = task
+	return nil
 }
 
 func (r *fakeTaskRepository) List(
@@ -160,6 +176,41 @@ func TestTaskServiceGetTaskReturnsNotFound(t *testing.T) {
 
 	if !errors.Is(err, domain.ErrTaskNotFound) {
 		t.Errorf("expected domain.ErrTaskNotFound, got %v", err)
+	}
+}
+
+func TestTaskServiceUpdateTask(t *testing.T) {
+	completed := true
+	title := "Build APIs"
+	expectedTask := domain.Task{ID: "task-1", Title: "Learn Go"}
+	repository := &fakeTaskRepository{
+		gottenTasks: map[string]domain.Task{"task-1": expectedTask},
+	}
+	service := NewTaskService(repository)
+
+	task, err := service.UpdateTask(t.Context(), " task-1 ", TaskUpdate{
+		Title:     &title,
+		Completed: &completed,
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if task.Title != title || !task.Completed {
+		t.Errorf("expected updated task, got %#v", task)
+	}
+}
+
+func TestTaskServiceUpdateTaskRejectsEmptyUpdate(t *testing.T) {
+	repository := &fakeTaskRepository{
+		gottenTasks: map[string]domain.Task{"task-1": {ID: "task-1", Title: "Learn Go"}},
+	}
+	service := NewTaskService(repository)
+
+	_, err := service.UpdateTask(t.Context(), "task-1", TaskUpdate{})
+
+	if !errors.Is(err, domain.ErrTaskUpdateEmpty) {
+		t.Errorf("expected domain.ErrTaskUpdateEmpty, got %v", err)
 	}
 }
 
