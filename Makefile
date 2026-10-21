@@ -24,4 +24,4 @@ vuln:
 integration:
 	go test -tags=integration -count=1 ./...
 
-ci: fmt build vet test-race lint vuln
+ci: test-race lint

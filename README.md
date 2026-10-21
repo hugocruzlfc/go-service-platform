@@ -259,7 +259,7 @@ TEST_DATABASE_URL='postgres://service_platform:service_platform_dev@localhost:54
 
 ### 6. Run the CI checks locally
 
-The `Makefile` mirrors the checks executed by GitHub Actions:
+The `Makefile` provides the same test and lint commands used by the pull request CI:
 
 ```bash
 make ci
