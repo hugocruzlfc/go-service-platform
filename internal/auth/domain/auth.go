@@ -29,6 +29,8 @@ var (
 	ErrPasswordHashInvalid = errors.New("auth: password hash is invalid")
 	// ErrAccessTokenInvalid indicates that an access token is invalid or expired.
 	ErrAccessTokenInvalid = errors.New("auth: access token is invalid")
+	// ErrRefreshTokenInvalid indicates that a refresh token is malformed or invalid.
+	ErrRefreshTokenInvalid = errors.New("auth: refresh token is invalid")
 	// ErrTokenSubjectRequired indicates that a token subject was not provided.
 	ErrTokenSubjectRequired = errors.New("auth: token subject is required")
 	// ErrTokenSessionRequired indicates that a token session ID was not provided.
