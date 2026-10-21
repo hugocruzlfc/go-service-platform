@@ -27,6 +27,12 @@ var (
 	ErrPasswordMismatch = errors.New("auth: password does not match")
 	// ErrPasswordHashInvalid indicates that a stored password hash is invalid.
 	ErrPasswordHashInvalid = errors.New("auth: password hash is invalid")
+	// ErrAccessTokenInvalid indicates that an access token is invalid or expired.
+	ErrAccessTokenInvalid = errors.New("auth: access token is invalid")
+	// ErrTokenSubjectRequired indicates that a token subject was not provided.
+	ErrTokenSubjectRequired = errors.New("auth: token subject is required")
+	// ErrTokenSessionRequired indicates that a token session ID was not provided.
+	ErrTokenSessionRequired = errors.New("auth: token session ID is required")
 	// ErrRoleNameRequired indicates that a role name was not provided.
 	ErrRoleNameRequired = errors.New("auth: role name is required")
 	// ErrPermissionNameRequired indicates that a permission name was not provided.
