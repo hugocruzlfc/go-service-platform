@@ -43,10 +43,18 @@ var (
 	ErrSessionIDRequired = errors.New("auth: session ID is required")
 	// ErrSessionUserIDRequired indicates that a session user ID was not provided.
 	ErrSessionUserIDRequired = errors.New("auth: session user ID is required")
+	// ErrSessionNotFound indicates that a session does not exist.
+	ErrSessionNotFound = errors.New("auth: session not found")
 	// ErrSessionFamilyRequired indicates that a session token family was not provided.
 	ErrSessionFamilyRequired = errors.New("auth: session token family is required")
 	// ErrSessionExpiryInvalid indicates that a session expires before it is created.
 	ErrSessionExpiryInvalid = errors.New("auth: session expiry must be after creation")
+	// ErrSessionExpired indicates that a session can no longer be used.
+	ErrSessionExpired = errors.New("auth: session expired")
+	// ErrSessionRevoked indicates that a session has already been revoked.
+	ErrSessionRevoked = errors.New("auth: session revoked")
+	// ErrRefreshTokenReused indicates that an old refresh token was reused.
+	ErrRefreshTokenReused = errors.New("auth: refresh token reused")
 )
 
 // User represents an identity that can authenticate with the service.
