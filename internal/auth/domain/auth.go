@@ -15,6 +15,12 @@ var (
 	ErrUserEmailRequired = errors.New("auth: user email is required")
 	// ErrUserEmailInvalid indicates that a user email is not valid.
 	ErrUserEmailInvalid = errors.New("auth: user email is invalid")
+	// ErrUserEmailTaken indicates that a user email is already registered.
+	ErrUserEmailTaken = errors.New("auth: user email is already registered")
+	// ErrUserNotFound indicates that a user does not exist.
+	ErrUserNotFound = errors.New("auth: user not found")
+	// ErrCredentialsNotFound indicates that user credentials do not exist.
+	ErrCredentialsNotFound = errors.New("auth: user credentials not found")
 	// ErrRoleNameRequired indicates that a role name was not provided.
 	ErrRoleNameRequired = errors.New("auth: role name is required")
 	// ErrPermissionNameRequired indicates that a permission name was not provided.
