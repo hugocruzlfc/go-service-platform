@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	defaultPort        = 8080
+	defaultPort = 8080
+	//nolint:gosec // G101: development-only credentials for the local Docker database.
 	defaultDatabaseURL = "postgres://service_platform:service_platform_dev@localhost:5432/service_platform?sslmode=disable"
 )
 

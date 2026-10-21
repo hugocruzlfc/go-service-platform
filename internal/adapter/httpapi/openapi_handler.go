@@ -29,7 +29,7 @@ const swaggerUIHTML = `<!doctype html>
 </html>`
 
 func openAPIHandler(logger *slog.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, _ *http.Request) {
 		spec, err := api.GetSpec()
 		if err != nil {
 			logger.Error("loading OpenAPI specification", slog.Any("error", err))
@@ -45,7 +45,7 @@ func openAPIHandler(logger *slog.Logger) http.HandlerFunc {
 }
 
 func swaggerUIHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(swaggerUIHTML))
 	}

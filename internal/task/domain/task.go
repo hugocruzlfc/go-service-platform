@@ -7,12 +7,16 @@ import (
 )
 
 var (
-	// Task validation errors.
-	ErrTaskIDRequired    = errors.New("task ID is required")
+	// ErrTaskIDRequired indicates that a task ID was not provided.
+	ErrTaskIDRequired = errors.New("task ID is required")
+	// ErrTaskTitleRequired indicates that a task title was not provided.
 	ErrTaskTitleRequired = errors.New("task title is required")
-	ErrTaskTitleTooLong  = errors.New("task title must not exceed 120 characters")
-	ErrTaskNotFound      = errors.New("task not found")
-	ErrTaskUpdateEmpty   = errors.New("task update must contain at least one field")
+	// ErrTaskTitleTooLong indicates that a task title exceeds 120 characters.
+	ErrTaskTitleTooLong = errors.New("task title must not exceed 120 characters")
+	// ErrTaskNotFound indicates that a task does not exist.
+	ErrTaskNotFound = errors.New("task not found")
+	// ErrTaskUpdateEmpty indicates that an update contains no fields.
+	ErrTaskUpdateEmpty = errors.New("task update must contain at least one field")
 )
 
 // Task represents a task managed by the service.

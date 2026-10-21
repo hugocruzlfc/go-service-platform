@@ -25,6 +25,7 @@ func NewTaskRepository() *TaskRepository {
 	}
 }
 
+// Create stores a task unless its ID already exists.
 func (r *TaskRepository) Create(
 	ctx context.Context,
 	task domain.Task,
@@ -105,6 +106,7 @@ func (r *TaskRepository) Update(
 	return nil
 }
 
+// List returns all tasks sorted by ID.
 func (r *TaskRepository) List(
 	ctx context.Context,
 ) ([]domain.Task, error) {

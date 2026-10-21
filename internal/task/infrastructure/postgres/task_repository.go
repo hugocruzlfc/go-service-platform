@@ -26,6 +26,7 @@ func NewTaskRepository(pool *pgxpool.Pool) *TaskRepository {
 	}
 }
 
+// Create inserts a task into PostgreSQL.
 func (r *TaskRepository) Create(
 	ctx context.Context,
 	task domain.Task,
@@ -118,6 +119,7 @@ func (r *TaskRepository) Update(
 	return nil
 }
 
+// List returns all tasks sorted by ID.
 func (r *TaskRepository) List(
 	ctx context.Context,
 ) ([]domain.Task, error) {

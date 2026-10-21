@@ -20,35 +20,35 @@ type failingTaskRepository struct {
 }
 
 func (r failingTaskRepository) Create(
-	ctx context.Context,
-	task domain.Task,
+	_ context.Context,
+	_ domain.Task,
 ) error {
 	return r.err
 }
 
 func (r failingTaskRepository) Delete(
-	ctx context.Context,
-	id string,
+	_ context.Context,
+	_ string,
 ) error {
 	return r.err
 }
 
 func (r failingTaskRepository) Get(
-	ctx context.Context,
-	id string,
+	_ context.Context,
+	_ string,
 ) (domain.Task, error) {
 	return domain.Task{}, r.err
 }
 
 func (r failingTaskRepository) Update(
-	ctx context.Context,
-	task domain.Task,
+	_ context.Context,
+	_ domain.Task,
 ) error {
 	return r.err
 }
 
 func (r failingTaskRepository) List(
-	ctx context.Context,
+	_ context.Context,
 ) ([]domain.Task, error) {
 	return nil, r.err
 }

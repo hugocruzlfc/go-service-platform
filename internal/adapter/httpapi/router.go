@@ -21,10 +21,10 @@ func NewRouter(
 
 	server := newStrictServer(service, readiness, logger)
 	strictHandler := api.NewStrictHandlerWithOptions(server, nil, api.StrictHTTPServerOptions{
-		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+		RequestErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, _ error) {
 			writeError(logger, w, http.StatusBadRequest, "INVALID_REQUEST", "invalid request body")
 		},
-		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+		ResponseErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
 			logger.Error("writing API response", slog.Any("error", err))
 			writeError(logger, w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 		},
@@ -32,7 +32,7 @@ func NewRouter(
 
 	api.HandlerWithOptions(strictHandler, api.StdHTTPServerOptions{
 		BaseRouter: mux,
-		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+		ErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, _ error) {
 			writeError(logger, w, http.StatusBadRequest, "INVALID_REQUEST", "invalid request")
 		},
 	})

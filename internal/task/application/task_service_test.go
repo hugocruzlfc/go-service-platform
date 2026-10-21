@@ -56,14 +56,14 @@ func (r *fakeTaskRepository) Get(
 }
 
 func (r *fakeTaskRepository) Delete(
-	ctx context.Context,
-	id string,
+	_ context.Context,
+	_ string,
 ) error {
 	return r.deleteErr
 }
 
 func (r *fakeTaskRepository) Update(
-	ctx context.Context,
+	_ context.Context,
 	task domain.Task,
 ) error {
 	if r.updateErr != nil {
@@ -252,7 +252,7 @@ func TestTaskServiceCreateTaskWrapsRepositoryError(t *testing.T) {
 		t.Errorf("expected wrapped repository error, got %v", err)
 	}
 
-	if err == repositoryError {
+	if errors.Unwrap(err) == nil {
 		t.Error("expected the service to add context to the repository error")
 	}
 }
@@ -267,7 +267,7 @@ func TestTaskServiceListTasksWrapsRepositoryError(t *testing.T) {
 		t.Errorf("expected wrapped repository error, got %v", err)
 	}
 
-	if err == repositoryError {
+	if errors.Unwrap(err) == nil {
 		t.Error("expected the service to add context to the repository error")
 	}
 }
