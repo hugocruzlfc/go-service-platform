@@ -21,6 +21,8 @@ var (
 	ErrUserNotFound = errors.New("auth: user not found")
 	// ErrCredentialsNotFound indicates that user credentials do not exist.
 	ErrCredentialsNotFound = errors.New("auth: user credentials not found")
+	// ErrInvalidCredentials indicates that authentication credentials are invalid.
+	ErrInvalidCredentials = errors.New("auth: invalid credentials")
 	// ErrPasswordRequired indicates that a password was not provided.
 	ErrPasswordRequired = errors.New("auth: password is required")
 	// ErrPasswordMismatch indicates that a password does not match its hash.
