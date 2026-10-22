@@ -25,11 +25,12 @@ func (f fakeDatabasePinger) Ping(context.Context) error {
 
 func newTestRouter() http.Handler {
 	repository := memory.NewTaskRepository()
-	service := application.NewTaskService(repository)
+	taskService := application.NewTaskService(repository)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	readiness := NewReadiness(fakeDatabasePinger{}, logger)
+	apiHandler := NewAPIHandler(taskService, readiness, logger)
 
-	return NewRouter(service, readiness, logger)
+	return NewRouter(apiHandler, nil, logger)
 }
 
 func TestVersionRoute(t *testing.T) {
@@ -163,10 +164,11 @@ func TestReadinessRoute(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			repository := memory.NewTaskRepository()
-			service := application.NewTaskService(repository)
+			taskService := application.NewTaskService(repository)
 			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 			readiness := NewReadiness(fakeDatabasePinger{err: test.databaseErr}, logger)
-			router := NewRouter(service, readiness, logger)
+			apiHandler := NewAPIHandler(taskService, readiness, logger)
+			router := NewRouter(apiHandler, nil, logger)
 
 			req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 			rec := httptest.NewRecorder()
@@ -186,11 +188,12 @@ func TestReadinessRoute(t *testing.T) {
 
 func TestReadinessRouteDuringShutdown(t *testing.T) {
 	repository := memory.NewTaskRepository()
-	service := application.NewTaskService(repository)
+	taskService := application.NewTaskService(repository)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	readiness := NewReadiness(fakeDatabasePinger{}, logger)
 	readiness.BeginDraining()
-	router := NewRouter(service, readiness, logger)
+	apiHandler := NewAPIHandler(taskService, readiness, logger)
+	router := NewRouter(apiHandler, nil, logger)
 
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()

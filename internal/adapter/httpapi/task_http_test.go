@@ -328,10 +328,11 @@ func TestCreateTaskRouteRejectsEmptyTitle(t *testing.T) {
 
 func TestTaskRoutesHideRepositoryErrors(t *testing.T) {
 	repositoryError := errors.New("database connection failed")
-	service := application.NewTaskService(failingTaskRepository{err: repositoryError})
+	taskService := application.NewTaskService(failingTaskRepository{err: repositoryError})
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	readiness := NewReadiness(fakeDatabasePinger{}, logger)
-	router := NewRouter(service, readiness, logger)
+	apiHandler := NewAPIHandler(taskService, readiness, logger)
+	router := NewRouter(apiHandler, nil, logger)
 
 	t.Run("create", func(t *testing.T) {
 		req := httptest.NewRequest(

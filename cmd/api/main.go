@@ -13,8 +13,9 @@ import (
 	"time"
 
 	"service-platform/internal/adapter/httpapi"
+	"service-platform/internal/auth"
 	"service-platform/internal/config"
-	"service-platform/internal/task/application"
+	"service-platform/internal/task"
 	"service-platform/internal/task/infrastructure/postgres"
 )
 
@@ -33,22 +34,29 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	databaseContext, cancelDatabase := context.WithTimeout(
-		ctx,
-		5*time.Second,
-	)
+	databaseContext, cancelDatabase := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelDatabase()
 
 	databasePool, err := postgres.NewPool(databaseContext, cfg.DatabaseURL)
 	if err != nil {
-		return err
+		return fmt.Errorf("connect to database: %w", err)
 	}
 	defer databasePool.Close()
 
-	repository := postgres.NewTaskRepository(databasePool)
-	service := application.NewTaskService(repository)
 	readiness := httpapi.NewReadiness(databasePool, logger)
-	router := httpapi.NewRouter(service, readiness, logger)
+	taskHTTPHandler := task.NewHTTPHandler(databasePool, readiness, logger)
+	authenticationHTTPHandler, err := auth.NewHTTPHandler(
+		databasePool,
+		cfg.AuthJWTPrivateKeyBase64,
+		cfg.AuthJWTIssuer,
+		cfg.AuthJWTAudience,
+		cfg.AuthAccessTokenTTL,
+		logger,
+	)
+	if err != nil {
+		return fmt.Errorf("configure authentication: %w", err)
+	}
+	router := httpapi.NewRouter(taskHTTPHandler, authenticationHTTPHandler, logger)
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,

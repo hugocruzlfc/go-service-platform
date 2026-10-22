@@ -1,2 +1,2 @@
-// Package httpapi exposes the task application through an HTTP API.
+// Package httpapi exposes application functionality through HTTP.
 package httpapi

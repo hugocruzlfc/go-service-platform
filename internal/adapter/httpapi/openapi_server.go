@@ -11,27 +11,27 @@ import (
 	"service-platform/internal/task/domain"
 )
 
-type strictServer struct {
-	service   *application.TaskService
-	readiness *Readiness
-	logger    *slog.Logger
+type openAPIServer struct {
+	taskService *application.TaskService
+	readiness   *Readiness
+	logger      *slog.Logger
 }
 
-var _ api.StrictServerInterface = (*strictServer)(nil)
+var _ api.StrictServerInterface = (*openAPIServer)(nil)
 
-func newStrictServer(
-	service *application.TaskService,
+func newOpenAPIServer(
+	taskService *application.TaskService,
 	readiness *Readiness,
 	logger *slog.Logger,
-) *strictServer {
-	return &strictServer{
-		service:   service,
-		readiness: readiness,
-		logger:    logger,
+) *openAPIServer {
+	return &openAPIServer{
+		taskService: taskService,
+		readiness:   readiness,
+		logger:      logger,
 	}
 }
 
-func (s *strictServer) GetHealth(
+func (s *openAPIServer) GetHealth(
 	context.Context,
 	api.GetHealthRequestObject,
 ) (api.GetHealthResponseObject, error) {
@@ -41,7 +41,7 @@ func (s *strictServer) GetHealth(
 	}), nil
 }
 
-func (s *strictServer) GetHealthz(
+func (s *openAPIServer) GetHealthz(
 	context.Context,
 	api.GetHealthzRequestObject,
 ) (api.GetHealthzResponseObject, error) {
@@ -51,7 +51,7 @@ func (s *strictServer) GetHealthz(
 	}), nil
 }
 
-func (s *strictServer) GetReadiness(
+func (s *openAPIServer) GetReadiness(
 	ctx context.Context,
 	_ api.GetReadinessRequestObject,
 ) (api.GetReadinessResponseObject, error) {
@@ -71,11 +71,11 @@ func (s *strictServer) GetReadiness(
 	}), nil
 }
 
-func (s *strictServer) ListTasks(
+func (s *openAPIServer) ListTasks(
 	ctx context.Context,
 	_ api.ListTasksRequestObject,
 ) (api.ListTasksResponseObject, error) {
-	tasks, err := s.service.ListTasks(ctx)
+	tasks, err := s.taskService.ListTasks(ctx)
 	if err != nil {
 		s.logger.Error("listing tasks", slog.Any("error", err))
 		return api.ListTasks500JSONResponse(internalErrorResponse()), nil
@@ -89,11 +89,11 @@ func (s *strictServer) ListTasks(
 	return api.ListTasks200JSONResponse(response), nil
 }
 
-func (s *strictServer) GetTask(
+func (s *openAPIServer) GetTask(
 	ctx context.Context,
 	request api.GetTaskRequestObject,
 ) (api.GetTaskResponseObject, error) {
-	task, err := s.service.GetTask(ctx, request.Id)
+	task, err := s.taskService.GetTask(ctx, request.Id)
 	if err != nil {
 		if errors.Is(err, domain.ErrTaskNotFound) {
 			return api.GetTask404JSONResponse(api.ErrorResponse{
@@ -111,7 +111,7 @@ func (s *strictServer) GetTask(
 	return api.GetTask200JSONResponse(toAPITask(task)), nil
 }
 
-func (s *strictServer) UpdateTask(
+func (s *openAPIServer) UpdateTask(
 	ctx context.Context,
 	request api.UpdateTaskRequestObject,
 ) (api.UpdateTaskResponseObject, error) {
@@ -119,7 +119,7 @@ func (s *strictServer) UpdateTask(
 		return api.UpdateTask400JSONResponse(invalidRequestResponse()), nil
 	}
 
-	task, err := s.service.UpdateTask(ctx, request.Id, application.TaskUpdate{
+	task, err := s.taskService.UpdateTask(ctx, request.Id, application.TaskUpdate{
 		Title:     request.Body.Title,
 		Completed: request.Body.Completed,
 	})
@@ -152,11 +152,11 @@ func (s *strictServer) UpdateTask(
 	return api.UpdateTask200JSONResponse(toAPITask(task)), nil
 }
 
-func (s *strictServer) DeleteTask(
+func (s *openAPIServer) DeleteTask(
 	ctx context.Context,
 	request api.DeleteTaskRequestObject,
 ) (api.DeleteTaskResponseObject, error) {
-	if err := s.service.DeleteTask(ctx, request.Id); err != nil {
+	if err := s.taskService.DeleteTask(ctx, request.Id); err != nil {
 		if errors.Is(err, domain.ErrTaskNotFound) {
 			return api.DeleteTask404JSONResponse(api.ErrorResponse{
 				Error: api.ErrorDetail{
@@ -182,7 +182,7 @@ func (s *strictServer) DeleteTask(
 	return api.DeleteTask204Response{}, nil
 }
 
-func (s *strictServer) CreateTask(
+func (s *openAPIServer) CreateTask(
 	ctx context.Context,
 	request api.CreateTaskRequestObject,
 ) (api.CreateTaskResponseObject, error) {
@@ -190,7 +190,7 @@ func (s *strictServer) CreateTask(
 		return api.CreateTask400JSONResponse(invalidRequestResponse()), nil
 	}
 
-	task, err := s.service.CreateTask(ctx, request.Body.Title)
+	task, err := s.taskService.CreateTask(ctx, request.Body.Title)
 	if err != nil {
 		if errors.Is(err, domain.ErrTaskIDRequired) ||
 			errors.Is(err, domain.ErrTaskTitleRequired) ||
@@ -210,7 +210,7 @@ func (s *strictServer) CreateTask(
 	return api.CreateTask201JSONResponse(toAPITask(task)), nil
 }
 
-func (s *strictServer) GetVersion(
+func (s *openAPIServer) GetVersion(
 	context.Context,
 	api.GetVersionRequestObject,
 ) (api.GetVersionResponseObject, error) {

@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestLoadUsesDefaultPort(t *testing.T) {
 	t.Setenv("PORT", "")
@@ -78,5 +81,33 @@ func TestLoadRejectsInvalidDatabaseURL(t *testing.T) {
 				t.Fatalf("expected an error for DATABASE_URL=%q", test.url)
 			}
 		})
+	}
+}
+
+func TestLoadUsesConfiguredAuthAccessTokenTTL(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://example/database")
+	t.Setenv("AUTH_ACCESS_TOKEN_TTL", "10m")
+
+	config, err := Load()
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if config.AuthAccessTokenTTL != 10*time.Minute {
+		t.Errorf("expected access token TTL %v, got %v", 10*time.Minute, config.AuthAccessTokenTTL)
+	}
+	if config.AuthJWTIssuer != defaultAuthJWTIssuer {
+		t.Errorf("expected default issuer %q, got %q", defaultAuthJWTIssuer, config.AuthJWTIssuer)
+	}
+	if config.AuthJWTAudience != defaultAuthJWTAudience {
+		t.Errorf("expected default audience %q, got %q", defaultAuthJWTAudience, config.AuthJWTAudience)
+	}
+}
+
+func TestLoadRejectsInvalidAuthAccessTokenTTL(t *testing.T) {
+	t.Setenv("AUTH_ACCESS_TOKEN_TTL", "0s")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("expected an error for a non-positive access token TTL")
 	}
 }
