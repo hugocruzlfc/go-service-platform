@@ -7,6 +7,7 @@ import (
 
 func TestLoadUsesDefaultPort(t *testing.T) {
 	t.Setenv("PORT", "")
+	t.Setenv("DATABASE_URL", "postgres://example/database")
 
 	config, err := Load()
 
@@ -17,9 +18,13 @@ func TestLoadUsesDefaultPort(t *testing.T) {
 	if config.HTTPAddr != ":8080" {
 		t.Errorf("expected address %q, got %q", ":8080", config.HTTPAddr)
 	}
+}
 
-	if config.DatabaseURL == "" {
-		t.Error("expected a default database URL")
+func TestLoadRequiresDatabaseURL(t *testing.T) {
+	t.Setenv("DATABASE_URL", "")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("expected an error when DATABASE_URL is not set")
 	}
 }
 

@@ -14,8 +14,6 @@ const (
 	defaultAuthJWTIssuer      = "service-platform"
 	defaultAuthJWTAudience    = "service-platform-api"
 	defaultAuthAccessTokenTTL = 15 * time.Minute
-	//nolint:gosec // G101: development-only credentials for the local Docker database.
-	defaultDatabaseURL = "postgres://service_platform:service_platform_dev@localhost:5432/service_platform?sslmode=disable"
 )
 
 // Config contains validated application configuration.
@@ -47,7 +45,7 @@ func Load() (Config, error) {
 
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
-		databaseURL = defaultDatabaseURL
+		return Config{}, errors.New("DATABASE_URL is required")
 	}
 
 	if err := validateDatabaseURL(databaseURL); err != nil {

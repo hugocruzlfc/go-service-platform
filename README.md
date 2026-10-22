@@ -12,7 +12,7 @@ Backend service platform built incrementally with Go.
 ```text
 cmd/
   api/                 Entry point of the HTTP API; wires dependencies and loads .env
-  migrate/             Entry point that applies pending database migrations
+  migrate/             Entry point that applies pending database migrations; loads .env
 internal/
   adapter/httpapi/     HTTP router, handlers, and Swagger UI/OpenAPI endpoints
   api/                 Code generated from api/openapi.yaml (do not edit)
@@ -32,32 +32,49 @@ Each module follows the same layers. `domain` holds the entities and rules,
 ## Configuration
 
 The API reads its configuration from environment variables. For local
-development, put them in a `.env` file in the project root. `cmd/api` loads
-that file automatically at startup. Variables already set in the shell take
+development, put them in a `.env` file in the project root. `cmd/api` and
+`cmd/migrate` load that file automatically at startup. Variables already set in the shell take
 precedence over the file. The file is ignored by git and must not be committed.
 
-Required for the API:
+The API requires `DATABASE_URL` and `AUTH_JWT_PRIVATE_KEY_BASE64`. This command
+creates `.env` with the local database URL and a newly generated key:
 
 ```bash
-echo "AUTH_JWT_PRIVATE_KEY_BASE64=$(openssl genpkey -algorithm ed25519 -outform DER | tail -c 32 | base64)" > .env
+cat > .env <<EOF
+DATABASE_URL=postgres://service_platform:service_platform_dev@localhost:5432/service_platform?sslmode=disable
+AUTH_JWT_PRIVATE_KEY_BASE64=$(openssl genpkey -algorithm ed25519 -outform DER | tail -c 32 | base64)
+EOF
 ```
 
-The command above overwrites `.env`. To add more variables later, edit the file
+The command above overwrites `.env`. To change values later, edit the file
 instead of running it again.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `AUTH_JWT_PRIVATE_KEY_BASE64` | Yes, for `cmd/api` | none | Ed25519 key in base64: a 32-byte seed or a 64-byte private key. Used to sign access tokens. |
+| `AUTH_JWT_PRIVATE_KEY_BASE64` | Yes | none | Ed25519 key in base64: a 32-byte seed or a 64-byte private key. Used to sign access tokens. |
 | `AUTH_JWT_ISSUER` | No | `service-platform` | Value of the `iss` claim in access tokens. |
 | `AUTH_JWT_AUDIENCE` | No | `service-platform-api` | Value of the `aud` claim in access tokens. |
 | `AUTH_ACCESS_TOKEN_TTL` | No | `15m` | Access token lifetime as a positive Go duration, for example `10m`. |
-| `DATABASE_URL` | No | local Docker Compose database | PostgreSQL URL. Must use the `postgres` or `postgresql` scheme. |
+| `DATABASE_URL` | Yes | none | PostgreSQL URL for the API and migrations. Must use the `postgres` or `postgresql` scheme. |
 | `PORT` | No | `8080` | HTTP port the API listens on. |
 | `TEST_DATABASE_URL` | Only for integration tests | none | PostgreSQL URL used by the `-tags=integration` tests. |
 
-`cmd/migrate` does not read `.env`. It uses `DATABASE_URL` from the shell, or
-the local default when it is not set. With the Docker Compose database running,
-the default is correct and you do not need to set it.
+`cmd/migrate` reads the same `.env` file, so both commands use the same
+database. `DATABASE_URL` has no default, so it must be set in `.env`. For the
+local Docker Compose database, use the connection details from
+[Start PostgreSQL](#1-start-postgresql):
+
+```bash
+DATABASE_URL=postgres://service_platform:service_platform_dev@localhost:5432/service_platform?sslmode=disable
+```
+
+To use an external PostgreSQL database, set the same variable to that database's URL:
+
+```bash
+DATABASE_URL=postgres://user:password@db.example.com:5432/service_platform?sslmode=require
+```
+
+Run `go run ./cmd/migrate` against that database before starting the API.
 
 ## Go module and dependency commands
 

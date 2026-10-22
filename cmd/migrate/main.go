@@ -3,10 +3,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"time"
+
+	"github.com/joho/godotenv"
 
 	"service-platform/internal/config"
 	"service-platform/internal/migration"
@@ -23,6 +26,12 @@ func main() {
 }
 
 func run(ctx context.Context, logger *slog.Logger) error {
+	// Local development only: a missing .env file is fine (production sets real env vars).
+	// Variables already set in the shell take precedence over the file.
+	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("load .env: %w", err)
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
