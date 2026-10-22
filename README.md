@@ -373,6 +373,24 @@ curl --fail --silent --request DELETE \
   http://localhost:8080/tasks/<task-id>
 ```
 
+### Logs and request IDs
+
+The API writes one JSON log line per request to stdout, with `request_id`,
+`method`, `route`, `status`, and `duration_ms`. Requests that return `5xx` are
+logged at `ERROR`. Health checks (`/health`, `/healthz`, `/readyz`) are logged at
+`DEBUG`, so they do not appear by default.
+
+Every response includes an `X-Request-ID` header. If your client sends a valid
+`X-Request-ID` (letters, digits, `-`, or `_`, up to 128 characters), the API reuses
+it. Use it to find the matching log line:
+
+```bash
+curl --include http://localhost:8080/version -H 'X-Request-ID: my-request-1'
+```
+
+Query strings, headers, and bodies are never logged, so tokens and passwords stay
+out of the logs.
+
 ### 5. Run tests
 
 The normal test suite does not require Docker:

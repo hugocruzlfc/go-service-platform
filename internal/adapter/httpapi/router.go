@@ -7,7 +7,7 @@ import (
 
 // NewRouter composes already-built HTTP handlers into the application router.
 // Task routes require a valid bearer access token; health, version, docs, and
-// authentication routes stay public.
+// authentication routes stay public. Every request is logged by RequestLogger.
 func NewRouter(
 	apiHandler http.Handler,
 	tokenVerifier AccessTokenVerifier,
@@ -22,5 +22,5 @@ func NewRouter(
 	}
 	mux.Handle("GET /openapi.json", openAPIHandler(logger))
 	mux.Handle("GET /docs", swaggerUIHandler())
-	return mux
+	return RequestLogger(logger, mux)
 }

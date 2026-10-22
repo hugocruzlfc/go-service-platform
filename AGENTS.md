@@ -86,6 +86,10 @@ Go interfaces are implemented implicitly. Keep interfaces small and defined acco
 - Login returns an Ed25519-signed JWT access token and a refresh token. The refresh token is also set as a `Secure`, `HttpOnly` cookie scoped to `/auth`.
 - `httpapi.RequireAccessToken` protects `/tasks` and `/tasks/`. It requires `Authorization: Bearer <token>` and returns `401` for missing or invalid tokens. It does not yet pass the claims to the handlers.
 
+### Observability
+
+`httpapi.RequestLogger` wraps the whole router. It assigns or reuses `X-Request-ID`, logs one line per request (method, route, status, duration), and never logs query strings, headers, or bodies. Health checks are logged at `DEBUG`. Metrics are not implemented yet.
+
 ### Configuration
 
 `internal/config.Load` reads environment variables and validates them. `DATABASE_URL` and `AUTH_JWT_PRIVATE_KEY_BASE64` are required. `.env.example` lists every variable.
