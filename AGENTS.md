@@ -27,30 +27,23 @@ The repository was initially created with Go 1.27.2 in `go.mod`. Verify the actu
 
 ## Current Architecture
 
-The project has been developed incrementally using these layers:
+The project is organized by module (`task`, `auth`) with layers inside each module:
 
-- `cmd/api`: application entry point and dependency wiring.
-- `internal/adapter/httpapi`: HTTP routing and handlers.
-- `internal/task/domain`: task entity, construction, and domain validation.
-- `internal/task/application`: TaskService and TaskRepository interface.
-- `internal/task/infrastructure/memory`: in-memory repository implementation.
+- `cmd/api`: HTTP API entry point. Loads `.env`, wires dependencies, starts the server.
+- `cmd/migrate`: applies pending SQL migrations. Loads `.env`.
+- `internal/adapter/httpapi`: router, HTTP handlers, bearer-token middleware, error responses, OpenAPI and Swagger UI endpoints.
+- `internal/api`: code generated from `api/openapi.yaml`. Do not edit by hand.
+- `internal/config`: loads configuration from environment variables and validates it.
+- `internal/migration`: migration runner and the SQL files in `sql/`, embedded into the binary.
+- `internal/task/domain`, `internal/task/application`: task entity, validation, and service.
+- `internal/task/infrastructure/postgres`: PostgreSQL task repository. `memory` is kept for unit tests.
+- `internal/auth/domain`, `internal/auth/application`: users, credentials, sessions, login, registration, refresh, and logout.
+- `internal/auth/infrastructure/{argon2,postgres,token}`: password hashing, PostgreSQL repositories, and Ed25519 JWT and refresh-token handling.
+- `internal/auth/authentication.go`: wires the auth module and returns its HTTP handler and token verifier.
 
-Expected files include:
+Use `README.md` for the current project structure, configuration variables, and commands.
 
-- `cmd/api/main.go`
-- `internal/adapter/httpapi/health_handler.go`
-- `internal/adapter/httpapi/version_handler.go`
-- `internal/adapter/httpapi/router.go`
-- `internal/adapter/httpapi/router_test.go`
-- `internal/adapter/httpapi/task_handler.go`
-- `internal/task/domain/task.go`
-- `internal/task/domain/task_test.go`
-- `internal/task/application/task_repository.go`
-- `internal/task/application/task_service.go`
-- `internal/task/infrastructure/memory/task_repository.go`
-- `internal/task/infrastructure/memory/task_repository_test.go`
-
-This is the expected state based on previous work, not a guarantee that every file currently exists or matches the description. Inspect the actual repository before acting.
+This section describes the intended architecture. Inspect the repository before relying on a specific file name.
 
 ## Existing Functionality
 
@@ -73,45 +66,44 @@ Domain errors include:
 
 ### Application
 
-`application.TaskRepository` defines:
+`application.TaskRepository` defines `Create`, `Get`, `Update`, `Delete`, and `List`.
 
-- `Create(context.Context, domain.Task) error`
-- `List(context.Context) ([]domain.Task, error)`
-
-`application.TaskService` exposes:
-
-- `CreateTask(ctx, title)`
-- `ListTasks(ctx)`
+`application.TaskService` exposes `CreateTask`, `GetTask`, `UpdateTask`, `DeleteTask`, and `ListTasks`.
 
 The service generates task IDs, constructs valid domain entities, delegates persistence to the repository, and wraps infrastructure errors with context.
 
 Go interfaces are implemented implicitly. Keep interfaces small and defined according to the needs of the consuming layer.
 
-### In-memory infrastructure
+### Persistence
 
-`memory.TaskRepository` uses a `map[string]domain.Task` protected by `sync.RWMutex`.
+- `postgres.TaskRepository` is the production repository, created from a `pgxpool.Pool`.
+- `memory.TaskRepository` uses a `map[string]domain.Task` protected by `sync.RWMutex`. It is used by unit tests and loses data when the process exits.
+- Migrations are SQL files in `internal/migration/sql`, applied by `cmd/migrate` and tracked in `schema_migrations`.
 
-It implements `Create` and `List`, rejects duplicate IDs, checks context cancellation, and sorts returned tasks by ID.
+### Authentication
 
-This implementation is intended for development and testing. Data is lost when the process exits.
+- `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, and `POST /auth/logout` are public.
+- Login returns an Ed25519-signed JWT access token and a refresh token. The refresh token is also set as a `Secure`, `HttpOnly` cookie scoped to `/auth`.
+- `httpapi.RequireAccessToken` protects `/tasks` and `/tasks/`. It requires `Authorization: Bearer <token>` and returns `401` for missing or invalid tokens. It does not yet pass the claims to the handlers.
+
+### Configuration
+
+`internal/config.Load` reads environment variables and validates them. `DATABASE_URL` and `AUTH_JWT_PRIVATE_KEY_BASE64` are required. `.env.example` lists every variable.
 
 ### HTTP API
 
-Existing endpoints:
+Public endpoints:
 
-- `GET /health`
-- `GET /version`
-- `POST /tasks`
-- `GET /tasks`
+- `GET /health`, `GET /healthz`, `GET /readyz`, `GET /version`
+- `GET /openapi.json`, `GET /docs`
+- `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`
 
-The task handler receives `*application.TaskService`, not the memory repository directly.
+Protected endpoints (require a bearer access token):
 
-`main.go` wires the concrete dependencies:
+- `POST /tasks`, `GET /tasks`
+- `GET /tasks/{id}`, `PATCH /tasks/{id}`, `DELETE /tasks/{id}`
 
-1. Create the memory repository.
-2. Create TaskService with the repository.
-3. Create the HTTP router with the service.
-4. Start the HTTP server.
+`cmd/api` wires the concrete dependencies: the PostgreSQL pool, the task module, and the auth module, then creates the router.
 
 The API uses `net/http` and Go's standard library. Do not introduce a web framework without a concrete reason.
 
@@ -170,12 +162,10 @@ First inspect the repository and establish the actual current state.
 
 Then continue with:
 
-1. Review and strengthen HTTP handler tests for task creation, listing, validation, malformed JSON, and error responses.
-2. Add application service tests using a small fake repository.
-3. Review dependency boundaries and improve error handling where necessary.
-4. Introduce configuration and graceful server shutdown.
-5. Add PostgreSQL persistence and database migrations, replacing the in-memory implementation through dependency wiring rather than rewriting the service.
-6. Add integration tests, Docker, observability, and CI incrementally.
+1. Link tasks to the authenticated user. The access-token middleware validates the token but discards its claims, so tasks are not yet scoped to a user.
+2. Describe the bearer security scheme and the `/auth` routes in `api/openapi.yaml`.
+3. Resolve the govulncheck finding `GO-2026-6809` (fixed in Go 1.27.3). CI runs `make vuln`, so this fails until the toolchain is upgraded.
+4. Add observability (metrics and tracing) and a Docker image for the API.
 
 Do not assume the current code is correct merely because previous tests passed. Verify it before making architectural decisions.
 

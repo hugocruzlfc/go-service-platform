@@ -61,6 +61,12 @@
       "skillPath": "skills/(architecture)/go-api-design/SKILL.md",
       "computedHash": "23df57152c1e4f7b61b9eb2edc4527a418e07d7410b33a9c1b18194b30b0792b"
     },
+    "go-architecture-review": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(architecture)/go-architecture-review/SKILL.md",
+      "computedHash": "4983ce809e6982db6b1bd0352bedf3dde09a43e189900ab7419cc984a96d79f3"
+    },
     "go-binary-size": {
       "source": "eduardo-sl/go-agent-skills",
       "sourceType": "github",
@@ -204,6 +210,12 @@
       "sourceType": "github",
       "skillPath": "skills/(workflow)/go-refactoring/SKILL.md",
       "computedHash": "97f1e30e80974c19a3b27273d5ff6cc69c9aeefaf9b6501c24c720bee8f15b88"
+    },
+    "go-security-audit": {
+      "source": "eduardo-sl/go-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/(safety)/go-security-audit/SKILL.md",
+      "computedHash": "6b480d25179f2ae639b13f63edb28372261b694ecae897c7b15fa1b1eaec51a6"
     },
     "go-semantic-tools": {
       "source": "eduardo-sl/go-agent-skills",

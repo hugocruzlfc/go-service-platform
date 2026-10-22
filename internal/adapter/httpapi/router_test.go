@@ -11,9 +11,21 @@ import (
 	"testing"
 
 	"service-platform/internal/api"
+	authapplication "service-platform/internal/auth/application"
+	"service-platform/internal/auth/domain"
 	"service-platform/internal/task/application"
 	"service-platform/internal/task/infrastructure/memory"
 )
+
+type fakeTokenVerifier struct{}
+
+func (fakeTokenVerifier) ParseAccessToken(encodedToken string) (authapplication.AccessTokenClaims, error) {
+	if encodedToken != testAccessToken {
+		return authapplication.AccessTokenClaims{}, domain.ErrAccessTokenInvalid
+	}
+
+	return authapplication.AccessTokenClaims{UserID: "user-1", SessionID: "session-1", TokenID: "token-1"}, nil
+}
 
 type fakeDatabasePinger struct {
 	err error
@@ -30,7 +42,7 @@ func newTestRouter() http.Handler {
 	readiness := NewReadiness(fakeDatabasePinger{}, logger)
 	apiHandler := NewAPIHandler(taskService, readiness, logger)
 
-	return NewRouter(apiHandler, nil, logger)
+	return NewRouter(apiHandler, nil, fakeTokenVerifier{}, logger)
 }
 
 func TestVersionRoute(t *testing.T) {
@@ -168,7 +180,7 @@ func TestReadinessRoute(t *testing.T) {
 			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 			readiness := NewReadiness(fakeDatabasePinger{err: test.databaseErr}, logger)
 			apiHandler := NewAPIHandler(taskService, readiness, logger)
-			router := NewRouter(apiHandler, nil, logger)
+			router := NewRouter(apiHandler, nil, fakeTokenVerifier{}, logger)
 
 			req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 			rec := httptest.NewRecorder()
@@ -193,7 +205,7 @@ func TestReadinessRouteDuringShutdown(t *testing.T) {
 	readiness := NewReadiness(fakeDatabasePinger{}, logger)
 	readiness.BeginDraining()
 	apiHandler := NewAPIHandler(taskService, readiness, logger)
-	router := NewRouter(apiHandler, nil, logger)
+	router := NewRouter(apiHandler, nil, fakeTokenVerifier{}, logger)
 
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()

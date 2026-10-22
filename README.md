@@ -36,18 +36,22 @@ development, put them in a `.env` file in the project root. `cmd/api` and
 `cmd/migrate` load that file automatically at startup. Variables already set in the shell take
 precedence over the file. The file is ignored by git and must not be committed.
 
-The API requires `DATABASE_URL` and `AUTH_JWT_PRIVATE_KEY_BASE64`. This command
-creates `.env` with the local database URL and a newly generated key:
+The API requires `DATABASE_URL` and `AUTH_JWT_PRIVATE_KEY_BASE64`. Create your
+local file from the template in the repository:
 
 ```bash
-cat > .env <<EOF
-DATABASE_URL=postgres://service_platform:service_platform_dev@localhost:5432/service_platform?sslmode=disable
-AUTH_JWT_PRIVATE_KEY_BASE64=$(openssl genpkey -algorithm ed25519 -outform DER | tail -c 32 | base64)
-EOF
+cp .env.example .env
 ```
 
-The command above overwrites `.env`. To change values later, edit the file
-instead of running it again.
+Then generate a key and paste the output into `AUTH_JWT_PRIVATE_KEY_BASE64` in
+`.env`:
+
+```bash
+openssl genpkey -algorithm ed25519 -outform DER | tail -c 32 | base64
+```
+
+`.env.example` already contains the local Docker Compose `DATABASE_URL`. Change
+it only if you use another database.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
@@ -263,7 +267,6 @@ curl --fail --silent http://localhost:8080/health
 curl --fail --silent http://localhost:8080/healthz
 curl --fail --silent http://localhost:8080/readyz
 curl --fail --silent http://localhost:8080/version
-curl --fail --silent http://localhost:8080/tasks
 ```
 
 Open the interactive API documentation in a browser:
@@ -319,35 +322,49 @@ curl --fail --silent --include \
   -d '{"refreshToken":"<refresh-token>"}'
 ```
 
-Refresh returns `200` with a new token pair. Logout returns `204`. The task
-endpoints below do not require the access token yet.
+Refresh returns `200` with a new token pair. Logout returns `204`.
+
+### Use the task endpoints
+
+Every `/tasks` request needs the `accessToken` from login. Replace
+`<access-token>` with that value and send it in the `Authorization` header.
+Requests without a valid token return `401`. The access token expires after
+`AUTH_ACCESS_TOKEN_TTL` (15 minutes by default), so log in again or refresh it
+when that happens.
 
 Create a task:
 
 ```bash
 curl --fail --silent \
   -X POST http://localhost:8080/tasks \
+  -H 'Authorization: Bearer <access-token>' \
   -H 'Content-Type: application/json' \
   -d '{"title":"Learn Go with PostgreSQL"}'
 ```
 
-List tasks again:
+List tasks:
 
 ```bash
-curl --fail --silent http://localhost:8080/tasks
+curl --fail --silent \
+  -H 'Authorization: Bearer <access-token>' \
+  http://localhost:8080/tasks
 ```
 
 Get, update, and delete a task using its returned ID:
 
 ```bash
-curl --fail --silent http://localhost:8080/tasks/<task-id>
+curl --fail --silent \
+  -H 'Authorization: Bearer <access-token>' \
+  http://localhost:8080/tasks/<task-id>
 
 curl --fail --silent \
   -X PATCH http://localhost:8080/tasks/<task-id> \
+  -H 'Authorization: Bearer <access-token>' \
   -H 'Content-Type: application/json' \
   -d '{"completed":true}'
 
 curl --fail --silent --request DELETE \
+  -H 'Authorization: Bearer <access-token>' \
   http://localhost:8080/tasks/<task-id>
 ```
 

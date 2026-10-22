@@ -19,6 +19,16 @@ type failingTaskRepository struct {
 	err error
 }
 
+const testAccessToken = "test-access-token"
+
+// newTaskRequest builds a request carrying a valid bearer token, so task tests
+// exercise the handlers rather than the auth middleware.
+func newTaskRequest(method string, target string, body io.Reader) *http.Request {
+	req := httptest.NewRequest(method, target, body)
+	req.Header.Set("Authorization", "Bearer "+testAccessToken)
+	return req
+}
+
 func (r failingTaskRepository) Create(
 	_ context.Context,
 	_ domain.Task,
@@ -56,7 +66,7 @@ func (r failingTaskRepository) List(
 func TestCreateTaskRoute(t *testing.T) {
 	router := newTestRouter()
 
-	req := httptest.NewRequest(
+	req := newTaskRequest(
 		http.MethodPost,
 		"/tasks",
 		bytes.NewBufferString(`{"title":"  Learn Go  "}`),
@@ -91,7 +101,7 @@ func TestCreateTaskRoute(t *testing.T) {
 func TestListTasksRoute(t *testing.T) {
 	router := newTestRouter()
 
-	createRequest := httptest.NewRequest(
+	createRequest := newTaskRequest(
 		http.MethodPost,
 		"/tasks",
 		bytes.NewBufferString(`{"title":"Learn Go"}`),
@@ -103,7 +113,7 @@ func TestListTasksRoute(t *testing.T) {
 		t.Fatalf("creating task: expected status %d, got %d", http.StatusCreated, createRecorder.Code)
 	}
 
-	listRequest := httptest.NewRequest(http.MethodGet, "/tasks", nil)
+	listRequest := newTaskRequest(http.MethodGet, "/tasks", nil)
 	listRecorder := httptest.NewRecorder()
 	router.ServeHTTP(listRecorder, listRequest)
 
@@ -129,7 +139,7 @@ func TestListTasksRoute(t *testing.T) {
 func TestGetTaskRoute(t *testing.T) {
 	router := newTestRouter()
 
-	createRequest := httptest.NewRequest(
+	createRequest := newTaskRequest(
 		http.MethodPost,
 		"/tasks",
 		bytes.NewBufferString(`{"title":"Learn Go"}`),
@@ -146,7 +156,7 @@ func TestGetTaskRoute(t *testing.T) {
 		t.Fatalf("decoding created task: %v", err)
 	}
 
-	getRequest := httptest.NewRequest(http.MethodGet, "/tasks/"+createdTask.ID, nil)
+	getRequest := newTaskRequest(http.MethodGet, "/tasks/"+createdTask.ID, nil)
 	getRecorder := httptest.NewRecorder()
 	router.ServeHTTP(getRecorder, getRequest)
 
@@ -165,7 +175,7 @@ func TestGetTaskRoute(t *testing.T) {
 
 func TestGetTaskRouteReturnsNotFound(t *testing.T) {
 	router := newTestRouter()
-	req := httptest.NewRequest(http.MethodGet, "/tasks/missing", nil)
+	req := newTaskRequest(http.MethodGet, "/tasks/missing", nil)
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)
@@ -176,7 +186,7 @@ func TestGetTaskRouteReturnsNotFound(t *testing.T) {
 func TestUpdateTaskRoute(t *testing.T) {
 	router := newTestRouter()
 
-	createRequest := httptest.NewRequest(
+	createRequest := newTaskRequest(
 		http.MethodPost,
 		"/tasks",
 		bytes.NewBufferString(`{"title":"Learn Go"}`),
@@ -189,7 +199,7 @@ func TestUpdateTaskRoute(t *testing.T) {
 		t.Fatalf("decoding created task: %v", err)
 	}
 
-	updateRequest := httptest.NewRequest(
+	updateRequest := newTaskRequest(
 		http.MethodPatch,
 		"/tasks/"+createdTask.ID,
 		bytes.NewBufferString(`{"completed":true}`),
@@ -215,7 +225,7 @@ func TestUpdateTaskRoute(t *testing.T) {
 
 func TestUpdateTaskRouteRejectsEmptyUpdate(t *testing.T) {
 	router := newTestRouter()
-	req := httptest.NewRequest(http.MethodPatch, "/tasks/task-1", bytes.NewBufferString(`{}`))
+	req := newTaskRequest(http.MethodPatch, "/tasks/task-1", bytes.NewBufferString(`{}`))
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)
@@ -226,7 +236,7 @@ func TestUpdateTaskRouteRejectsEmptyUpdate(t *testing.T) {
 func TestDeleteTaskRoute(t *testing.T) {
 	router := newTestRouter()
 
-	createRequest := httptest.NewRequest(
+	createRequest := newTaskRequest(
 		http.MethodPost,
 		"/tasks",
 		bytes.NewBufferString(`{"title":"Learn Go"}`),
@@ -239,7 +249,7 @@ func TestDeleteTaskRoute(t *testing.T) {
 		t.Fatalf("decoding created task: %v", err)
 	}
 
-	deleteRequest := httptest.NewRequest(http.MethodDelete, "/tasks/"+createdTask.ID, nil)
+	deleteRequest := newTaskRequest(http.MethodDelete, "/tasks/"+createdTask.ID, nil)
 	deleteRecorder := httptest.NewRecorder()
 	router.ServeHTTP(deleteRecorder, deleteRequest)
 
@@ -250,7 +260,7 @@ func TestDeleteTaskRoute(t *testing.T) {
 		t.Errorf("expected empty response body, got %q", deleteRecorder.Body.String())
 	}
 
-	getRequest := httptest.NewRequest(http.MethodGet, "/tasks/"+createdTask.ID, nil)
+	getRequest := newTaskRequest(http.MethodGet, "/tasks/"+createdTask.ID, nil)
 	getRecorder := httptest.NewRecorder()
 	router.ServeHTTP(getRecorder, getRequest)
 	assertErrorResponse(t, getRecorder, http.StatusNotFound, "NOT_FOUND", "task not found")
@@ -258,7 +268,7 @@ func TestDeleteTaskRoute(t *testing.T) {
 
 func TestDeleteTaskRouteReturnsNotFound(t *testing.T) {
 	router := newTestRouter()
-	req := httptest.NewRequest(http.MethodDelete, "/tasks/missing", nil)
+	req := newTaskRequest(http.MethodDelete, "/tasks/missing", nil)
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)
@@ -269,7 +279,7 @@ func TestDeleteTaskRouteReturnsNotFound(t *testing.T) {
 func TestCreateTaskRouteRejectsInvalidJSON(t *testing.T) {
 	router := newTestRouter()
 
-	req := httptest.NewRequest(
+	req := newTaskRequest(
 		http.MethodPost,
 		"/tasks",
 		bytes.NewBufferString(`{"title":`),
@@ -284,7 +294,7 @@ func TestCreateTaskRouteRejectsInvalidJSON(t *testing.T) {
 func TestCreateTaskRouteRejectsTrailingJSON(t *testing.T) {
 	router := newTestRouter()
 
-	req := httptest.NewRequest(
+	req := newTaskRequest(
 		http.MethodPost,
 		"/tasks",
 		bytes.NewBufferString(`{"title":"Learn Go"}{"extra":"data"}`),
@@ -299,7 +309,7 @@ func TestCreateTaskRouteRejectsTrailingJSON(t *testing.T) {
 func TestCreateTaskRouteRejectsOversizedBody(t *testing.T) {
 	router := newTestRouter()
 
-	req := httptest.NewRequest(
+	req := newTaskRequest(
 		http.MethodPost,
 		"/tasks",
 		bytes.NewReader(bytes.Repeat([]byte("a"), 1<<20+1)),
@@ -314,7 +324,7 @@ func TestCreateTaskRouteRejectsOversizedBody(t *testing.T) {
 func TestCreateTaskRouteRejectsEmptyTitle(t *testing.T) {
 	router := newTestRouter()
 
-	req := httptest.NewRequest(
+	req := newTaskRequest(
 		http.MethodPost,
 		"/tasks",
 		bytes.NewBufferString(`{"title":"   "}`),
@@ -332,10 +342,10 @@ func TestTaskRoutesHideRepositoryErrors(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	readiness := NewReadiness(fakeDatabasePinger{}, logger)
 	apiHandler := NewAPIHandler(taskService, readiness, logger)
-	router := NewRouter(apiHandler, nil, logger)
+	router := NewRouter(apiHandler, nil, fakeTokenVerifier{}, logger)
 
 	t.Run("create", func(t *testing.T) {
-		req := httptest.NewRequest(
+		req := newTaskRequest(
 			http.MethodPost,
 			"/tasks",
 			bytes.NewBufferString(`{"title":"Learn Go"}`),
@@ -348,7 +358,7 @@ func TestTaskRoutesHideRepositoryErrors(t *testing.T) {
 	})
 
 	t.Run("list", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/tasks", nil)
+		req := newTaskRequest(http.MethodGet, "/tasks", nil)
 		rec := httptest.NewRecorder()
 
 		router.ServeHTTP(rec, req)
@@ -357,7 +367,7 @@ func TestTaskRoutesHideRepositoryErrors(t *testing.T) {
 	})
 
 	t.Run("get", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/tasks/task-1", nil)
+		req := newTaskRequest(http.MethodGet, "/tasks/task-1", nil)
 		rec := httptest.NewRecorder()
 
 		router.ServeHTTP(rec, req)
@@ -366,7 +376,7 @@ func TestTaskRoutesHideRepositoryErrors(t *testing.T) {
 	})
 
 	t.Run("update", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPatch, "/tasks/task-1", bytes.NewBufferString(`{"completed":true}`))
+		req := newTaskRequest(http.MethodPatch, "/tasks/task-1", bytes.NewBufferString(`{"completed":true}`))
 		rec := httptest.NewRecorder()
 
 		router.ServeHTTP(rec, req)
@@ -375,7 +385,7 @@ func TestTaskRoutesHideRepositoryErrors(t *testing.T) {
 	})
 
 	t.Run("delete", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodDelete, "/tasks/task-1", nil)
+		req := newTaskRequest(http.MethodDelete, "/tasks/task-1", nil)
 		rec := httptest.NewRecorder()
 
 		router.ServeHTTP(rec, req)

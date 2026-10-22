@@ -27,10 +27,10 @@ func NewHTTPHandler(
 	jwtAudience string,
 	accessTokenTTL time.Duration,
 	logger *slog.Logger,
-) (http.Handler, error) {
+) (http.Handler, application.TokenService, error) {
 	jwtPrivateKey, err := decodeJWTPrivateKey(encodedJWTPrivateKey)
 	if err != nil {
-		return nil, fmt.Errorf("load JWT private key: %w", err)
+		return nil, nil, fmt.Errorf("load JWT private key: %w", err)
 	}
 
 	accessTokenService, err := token.NewService(
@@ -40,7 +40,7 @@ func NewHTTPHandler(
 		accessTokenTTL,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("configure access tokens: %w", err)
+		return nil, nil, fmt.Errorf("configure access tokens: %w", err)
 	}
 
 	userRepository := postgres.NewUserRepository(databasePool)
@@ -73,7 +73,7 @@ func NewHTTPHandler(
 		sessionService,
 	)
 
-	return httpapi.NewAuthHandler(authenticationService, logger), nil
+	return httpapi.NewAuthHandler(authenticationService, logger), accessTokenService, nil
 }
 
 func decodeJWTPrivateKey(encodedKey string) (ed25519.PrivateKey, error) {
