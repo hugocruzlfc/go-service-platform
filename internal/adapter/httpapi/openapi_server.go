@@ -7,27 +7,31 @@ import (
 	"time"
 
 	"service-platform/internal/api"
+	authapplication "service-platform/internal/auth/application"
 	"service-platform/internal/task/application"
 	"service-platform/internal/task/domain"
 )
 
 type openAPIServer struct {
-	taskService *application.TaskService
-	readiness   *Readiness
-	logger      *slog.Logger
+	taskService           *application.TaskService
+	authenticationService authapplication.AuthenticationUseCase
+	readiness             *Readiness
+	logger                *slog.Logger
 }
 
 var _ api.StrictServerInterface = (*openAPIServer)(nil)
 
 func newOpenAPIServer(
 	taskService *application.TaskService,
+	authenticationService authapplication.AuthenticationUseCase,
 	readiness *Readiness,
 	logger *slog.Logger,
 ) *openAPIServer {
 	return &openAPIServer{
-		taskService: taskService,
-		readiness:   readiness,
-		logger:      logger,
+		taskService:           taskService,
+		authenticationService: authenticationService,
+		readiness:             readiness,
+		logger:                logger,
 	}
 }
 

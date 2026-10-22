@@ -78,6 +78,8 @@ paths:
       summary: List tasks
       tags:
         - tasks
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: Tasks ordered by ID.
@@ -87,6 +89,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Task'
+        '401':
+          description: Missing, malformed, or invalid access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error.
           content:
@@ -99,6 +107,8 @@ paths:
       summary: Create a task
       tags:
         - tasks
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -118,6 +128,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing, malformed, or invalid access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error.
           content:
@@ -131,6 +147,8 @@ paths:
       summary: Get a task
       tags:
         - tasks
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -151,6 +169,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing, malformed, or invalid access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error.
           content:
@@ -163,6 +187,8 @@ paths:
       summary: Update a task
       tags:
         - tasks
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -195,6 +221,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing, malformed, or invalid access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error.
           content:
@@ -207,6 +239,8 @@ paths:
       summary: Delete a task
       tags:
         - tasks
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -223,6 +257,169 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing, malformed, or invalid access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/register:
+    post:
+      operationId: registerUser
+      summary: Register a user
+      description: Creates a user with an email and password. Does not log the user in.
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid email or password.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email is already registered.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      operationId: loginUser
+      summary: Log in
+      description: Returns an access token and a refresh token. The refresh token is also set as a Secure, HttpOnly cookie scoped to /auth.
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Logged in.
+          headers:
+            Set-Cookie:
+              description: Refresh token cookie (HttpOnly, Secure, Path=/auth).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '401':
+          description: Invalid credentials.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      operationId: refreshSession
+      summary: Refresh the session
+      description: Exchanges a refresh token for a new token pair. The refresh token is read from the refresh_token cookie or from the request body.
+      tags:
+        - auth
+      parameters:
+        - name: refresh_token
+          in: cookie
+          required: false
+          description: Refresh token cookie set by login or refresh.
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: New token pair issued.
+          headers:
+            Set-Cookie:
+              description: Rotated refresh token cookie.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '401':
+          description: Refresh token is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      operationId: logoutUser
+      summary: Log out
+      description: Revokes the refresh token. The refresh token is read from the refresh_token cookie or from the request body. Always returns 204 when the token is missing or already invalid.
+      tags:
+        - auth
+      parameters:
+        - name: refresh_token
+          in: cookie
+          required: false
+          description: Refresh token cookie to revoke.
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '204':
+          description: Session ended. Clears the refresh token cookie.
+          headers:
+            Set-Cookie:
+              description: Expired refresh token cookie.
+              schema:
+                type: string
         '500':
           description: Internal server error.
           content:
@@ -231,7 +428,32 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token returned by POST /auth/login or POST /auth/refresh.
+
   schemas:
+    AuthTokens:
+      type: object
+      description: Access and refresh tokens issued after login or refresh.
+      required:
+        - accessToken
+        - expiresAt
+      properties:
+        accessToken:
+          type: string
+          description: 'Short-lived JWT sent as "Authorization: Bearer <token>".'
+        refreshToken:
+          type: string
+          description: Opaque refresh token. Omitted from responses that only set the cookie.
+        expiresAt:
+          type: string
+          format: date-time
+          description: UTC time at which the access token expires.
+
     CreateTaskRequest:
       type: object
       description: Payload used to create a task.
@@ -267,6 +489,21 @@ components:
         error:
           $ref: '#/components/schemas/ErrorDetail'
 
+    LoginRequest:
+      type: object
+      description: Credentials used to log in.
+      required:
+        - email
+        - password
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
     HealthResponse:
       type: object
       description: Service health status and response timestamp.
@@ -281,6 +518,29 @@ components:
           type: string
           format: date-time
           description: UTC timestamp at which the response was generated.
+
+    RefreshRequest:
+      type: object
+      description: Refresh token in the body. Not needed when the refresh_token cookie is sent.
+      additionalProperties: false
+      properties:
+        refreshToken:
+          type: string
+
+    RegisterRequest:
+      type: object
+      description: Details used to create a user.
+      required:
+        - email
+        - password
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
 
     Task:
       type: object
@@ -318,6 +578,26 @@ components:
         completed:
           type: boolean
           description: New completion state for the task.
+
+    User:
+      type: object
+      description: A registered user. The password is never returned.
+      required:
+        - id
+        - email
+        - createdAt
+        - disabled
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        createdAt:
+          type: string
+          format: date-time
+        disabled:
+          type: boolean
 
     VersionResponse:
       type: object

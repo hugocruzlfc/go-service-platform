@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,7 +22,20 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// AuthTokens Access and refresh tokens issued after login or refresh.
+type AuthTokens struct {
+	// AccessToken Short-lived JWT sent as "Authorization: Bearer <token>".
+	AccessToken string `json:"accessToken"`
+
+	// ExpiresAt UTC time at which the access token expires.
+	ExpiresAt time.Time `json:"expiresAt"`
+
+	// RefreshToken Opaque refresh token. Omitted from responses that only set the cookie.
+	RefreshToken *string `json:"refreshToken,omitempty"`
+}
 
 // CreateTaskRequest Payload used to create a task.
 type CreateTaskRequest struct {
@@ -53,6 +67,23 @@ type HealthResponse struct {
 	Time time.Time `json:"time"`
 }
 
+// LoginRequest Credentials used to log in.
+type LoginRequest struct {
+	Email    openapi_types.Email `json:"email"`
+	Password string              `json:"password"`
+}
+
+// RefreshRequest Refresh token in the body. Not needed when the refresh_token cookie is sent.
+type RefreshRequest struct {
+	RefreshToken *string `json:"refreshToken,omitempty"`
+}
+
+// RegisterRequest Details used to create a user.
+type RegisterRequest struct {
+	Email    openapi_types.Email `json:"email"`
+	Password string              `json:"password"`
+}
+
 // Task A task managed by the service.
 type Task struct {
 	// Completed Whether the task has been completed.
@@ -77,11 +108,43 @@ type UpdateTaskRequest struct {
 	Title *string `json:"title,omitempty"`
 }
 
+// User A registered user. The password is never returned.
+type User struct {
+	CreatedAt time.Time           `json:"createdAt"`
+	Disabled  bool                `json:"disabled"`
+	Email     openapi_types.Email `json:"email"`
+	Id        string              `json:"id"`
+}
+
 // VersionResponse Current service version.
 type VersionResponse struct {
 	// Version Semantic version of the service.
 	Version string `json:"version"`
 }
+
+// LogoutUserParams defines parameters for LogoutUser.
+type LogoutUserParams struct {
+	// RefreshToken Refresh token cookie to revoke.
+	RefreshToken *string `form:"refresh_token,omitempty" json:"refresh_token,omitempty"`
+}
+
+// RefreshSessionParams defines parameters for RefreshSession.
+type RefreshSessionParams struct {
+	// RefreshToken Refresh token cookie set by login or refresh.
+	RefreshToken *string `form:"refresh_token,omitempty" json:"refresh_token,omitempty"`
+}
+
+// LoginUserJSONRequestBody defines body for LoginUser for application/json ContentType.
+type LoginUserJSONRequestBody = LoginRequest
+
+// LogoutUserJSONRequestBody defines body for LogoutUser for application/json ContentType.
+type LogoutUserJSONRequestBody = RefreshRequest
+
+// RefreshSessionJSONRequestBody defines body for RefreshSession for application/json ContentType.
+type RefreshSessionJSONRequestBody = RefreshRequest
+
+// RegisterUserJSONRequestBody defines body for RegisterUser for application/json ContentType.
+type RegisterUserJSONRequestBody = RegisterRequest
 
 // CreateTaskJSONRequestBody defines body for CreateTask for application/json ContentType.
 type CreateTaskJSONRequestBody = CreateTaskRequest
@@ -163,6 +226,78 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 
+	// LoginUserWithBody Log in
+	//
+	// Returns an access token and a refresh token. The refresh token is also set as a Secure, HttpOnly cookie scoped to /auth.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/login (the `LoginUser` operationId).
+	LoginUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LoginUser Log in
+	//
+	// Returns an access token and a refresh token. The refresh token is also set as a Secure, HttpOnly cookie scoped to /auth.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/login (the `LoginUser` operationId).
+	LoginUser(ctx context.Context, body LoginUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LogoutUserWithBody Log out
+	//
+	// Revokes the refresh token. The refresh token is read from the refresh_token cookie or from the request body. Always returns 204 when the token is missing or already invalid.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/logout (the `LogoutUser` operationId).
+	LogoutUserWithBody(ctx context.Context, params *LogoutUserParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LogoutUser Log out
+	//
+	// Revokes the refresh token. The refresh token is read from the refresh_token cookie or from the request body. Always returns 204 when the token is missing or already invalid.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/logout (the `LogoutUser` operationId).
+	LogoutUser(ctx context.Context, params *LogoutUserParams, body LogoutUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RefreshSessionWithBody Refresh the session
+	//
+	// Exchanges a refresh token for a new token pair. The refresh token is read from the refresh_token cookie or from the request body.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/refresh (the `RefreshSession` operationId).
+	RefreshSessionWithBody(ctx context.Context, params *RefreshSessionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RefreshSession Refresh the session
+	//
+	// Exchanges a refresh token for a new token pair. The refresh token is read from the refresh_token cookie or from the request body.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/refresh (the `RefreshSession` operationId).
+	RefreshSession(ctx context.Context, params *RefreshSessionParams, body RefreshSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RegisterUserWithBody Register a user
+	//
+	// Creates a user with an email and password. Does not log the user in.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/register (the `RegisterUser` operationId).
+	RegisterUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RegisterUser Register a user
+	//
+	// Creates a user with an email and password. Does not log the user in.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/register (the `RegisterUser` operationId).
+	RegisterUser(ctx context.Context, body RegisterUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetHealth Check service liveness
 	//
 	// Returns a successful response while the service process is running.
@@ -231,6 +366,158 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /version (the `GetVersion` operationId).
 	GetVersion(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+// LoginUserWithBody Log in
+//
+// Returns an access token and a refresh token. The refresh token is also set as a Secure, HttpOnly cookie scoped to /auth.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/login (the `LoginUser` operationId).
+func (c *Client) LoginUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLoginUserRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// LoginUser Log in
+//
+// Returns an access token and a refresh token. The refresh token is also set as a Secure, HttpOnly cookie scoped to /auth.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/login (the `LoginUser` operationId).
+func (c *Client) LoginUser(ctx context.Context, body LoginUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLoginUserRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// LogoutUserWithBody Log out
+//
+// Revokes the refresh token. The refresh token is read from the refresh_token cookie or from the request body. Always returns 204 when the token is missing or already invalid.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/logout (the `LogoutUser` operationId).
+func (c *Client) LogoutUserWithBody(ctx context.Context, params *LogoutUserParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLogoutUserRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// LogoutUser Log out
+//
+// Revokes the refresh token. The refresh token is read from the refresh_token cookie or from the request body. Always returns 204 when the token is missing or already invalid.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/logout (the `LogoutUser` operationId).
+func (c *Client) LogoutUser(ctx context.Context, params *LogoutUserParams, body LogoutUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLogoutUserRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RefreshSessionWithBody Refresh the session
+//
+// Exchanges a refresh token for a new token pair. The refresh token is read from the refresh_token cookie or from the request body.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/refresh (the `RefreshSession` operationId).
+func (c *Client) RefreshSessionWithBody(ctx context.Context, params *RefreshSessionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRefreshSessionRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RefreshSession Refresh the session
+//
+// Exchanges a refresh token for a new token pair. The refresh token is read from the refresh_token cookie or from the request body.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/refresh (the `RefreshSession` operationId).
+func (c *Client) RefreshSession(ctx context.Context, params *RefreshSessionParams, body RefreshSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRefreshSessionRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RegisterUserWithBody Register a user
+//
+// Creates a user with an email and password. Does not log the user in.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/register (the `RegisterUser` operationId).
+func (c *Client) RegisterUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRegisterUserRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RegisterUser Register a user
+//
+// Creates a user with an email and password. Does not log the user in.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/register (the `RegisterUser` operationId).
+func (c *Client) RegisterUser(ctx context.Context, body RegisterUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRegisterUserRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 // GetHealth Check service liveness
@@ -410,6 +697,200 @@ func (c *Client) GetVersion(ctx context.Context, reqEditors ...RequestEditorFn) 
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewLoginUserRequest calls the generic LoginUser builder with application/json body
+func NewLoginUserRequest(server string, body LoginUserJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewLoginUserRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewLoginUserRequestWithBody constructs an http.Request for the LoginUser method, with any body, and a specified content type
+func NewLoginUserRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/login")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewLogoutUserRequest calls the generic LogoutUser builder with application/json body
+func NewLogoutUserRequest(server string, params *LogoutUserParams, body LogoutUserJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewLogoutUserRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewLogoutUserRequestWithBody constructs an http.Request for the LogoutUser method, with any body, and a specified content type
+func NewLogoutUserRequestWithBody(server string, params *LogoutUserParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/logout")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.RefreshToken != nil {
+			var cookieParam0 string
+
+			cookieParam0, err = runtime.StyleParamWithOptions("simple", true, "refresh_token", *params.RefreshToken, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationCookie, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			cookie0 := &http.Cookie{
+				Name:  "refresh_token",
+				Value: cookieParam0,
+			}
+			req.AddCookie(cookie0)
+		}
+	}
+	return req, nil
+}
+
+// NewRefreshSessionRequest calls the generic RefreshSession builder with application/json body
+func NewRefreshSessionRequest(server string, params *RefreshSessionParams, body RefreshSessionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRefreshSessionRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewRefreshSessionRequestWithBody constructs an http.Request for the RefreshSession method, with any body, and a specified content type
+func NewRefreshSessionRequestWithBody(server string, params *RefreshSessionParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/refresh")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.RefreshToken != nil {
+			var cookieParam0 string
+
+			cookieParam0, err = runtime.StyleParamWithOptions("simple", true, "refresh_token", *params.RefreshToken, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationCookie, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			cookie0 := &http.Cookie{
+				Name:  "refresh_token",
+				Value: cookieParam0,
+			}
+			req.AddCookie(cookie0)
+		}
+	}
+	return req, nil
+}
+
+// NewRegisterUserRequest calls the generic RegisterUser builder with application/json body
+func NewRegisterUserRequest(server string, body RegisterUserJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRegisterUserRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewRegisterUserRequestWithBody constructs an http.Request for the RegisterUser method, with any body, and a specified content type
+func NewRegisterUserRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/register")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
 }
 
 // NewGetHealthRequest constructs an http.Request for the GetHealth method
@@ -746,6 +1227,78 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
+	// LoginUserWithBodyWithResponse Log in
+	//
+	// Returns an access token and a refresh token. The refresh token is also set as a Secure, HttpOnly cookie scoped to /auth.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /auth/login (the `LoginUser` operationId).
+	LoginUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LoginUserResponse, error)
+
+	// LoginUserWithResponse Log in
+	//
+	// Returns an access token and a refresh token. The refresh token is also set as a Secure, HttpOnly cookie scoped to /auth.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /auth/login (the `LoginUser` operationId).
+	LoginUserWithResponse(ctx context.Context, body LoginUserJSONRequestBody, reqEditors ...RequestEditorFn) (*LoginUserResponse, error)
+
+	// LogoutUserWithBodyWithResponse Log out
+	//
+	// Revokes the refresh token. The refresh token is read from the refresh_token cookie or from the request body. Always returns 204 when the token is missing or already invalid.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /auth/logout (the `LogoutUser` operationId).
+	LogoutUserWithBodyWithResponse(ctx context.Context, params *LogoutUserParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LogoutUserResponse, error)
+
+	// LogoutUserWithResponse Log out
+	//
+	// Revokes the refresh token. The refresh token is read from the refresh_token cookie or from the request body. Always returns 204 when the token is missing or already invalid.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /auth/logout (the `LogoutUser` operationId).
+	LogoutUserWithResponse(ctx context.Context, params *LogoutUserParams, body LogoutUserJSONRequestBody, reqEditors ...RequestEditorFn) (*LogoutUserResponse, error)
+
+	// RefreshSessionWithBodyWithResponse Refresh the session
+	//
+	// Exchanges a refresh token for a new token pair. The refresh token is read from the refresh_token cookie or from the request body.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /auth/refresh (the `RefreshSession` operationId).
+	RefreshSessionWithBodyWithResponse(ctx context.Context, params *RefreshSessionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RefreshSessionResponse, error)
+
+	// RefreshSessionWithResponse Refresh the session
+	//
+	// Exchanges a refresh token for a new token pair. The refresh token is read from the refresh_token cookie or from the request body.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /auth/refresh (the `RefreshSession` operationId).
+	RefreshSessionWithResponse(ctx context.Context, params *RefreshSessionParams, body RefreshSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*RefreshSessionResponse, error)
+
+	// RegisterUserWithBodyWithResponse Register a user
+	//
+	// Creates a user with an email and password. Does not log the user in.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /auth/register (the `RegisterUser` operationId).
+	RegisterUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RegisterUserResponse, error)
+
+	// RegisterUserWithResponse Register a user
+	//
+	// Creates a user with an email and password. Does not log the user in.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /auth/register (the `RegisterUser` operationId).
+	RegisterUserWithResponse(ctx context.Context, body RegisterUserJSONRequestBody, reqEditors ...RequestEditorFn) (*RegisterUserResponse, error)
+
 	// GetHealthWithResponse Check service liveness
 	//
 	// Returns a successful response while the service process is running.
@@ -828,6 +1381,240 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /version (the `GetVersion` operationId).
 	GetVersionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetVersionResponse, error)
+}
+
+// LoginUserResponse200Headers the declared response headers of an HTTP 200 response for LoginUser
+type LoginUserResponse200Headers struct {
+	SetCookie *string
+}
+
+type LoginUserResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthTokens
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *LoginUserResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r LoginUserResponse) GetJSON200() *AuthTokens {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r LoginUserResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r LoginUserResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r LoginUserResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r LoginUserResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r LoginUserResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r LoginUserResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// LogoutUserResponse204Headers the declared response headers of an HTTP 204 response for LogoutUser
+type LogoutUserResponse204Headers struct {
+	SetCookie *string
+}
+
+type LogoutUserResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+	// Headers204 the parsed response headers for an HTTP 204 response
+	Headers204 *LogoutUserResponse204Headers
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r LogoutUserResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r LogoutUserResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r LogoutUserResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r LogoutUserResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r LogoutUserResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RefreshSessionResponse200Headers the declared response headers of an HTTP 200 response for RefreshSession
+type RefreshSessionResponse200Headers struct {
+	SetCookie *string
+}
+
+type RefreshSessionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthTokens
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *RefreshSessionResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RefreshSessionResponse) GetJSON200() *AuthTokens {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r RefreshSessionResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r RefreshSessionResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r RefreshSessionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RefreshSessionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RefreshSessionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RefreshSessionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RegisterUserResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *User
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *ErrorResponse
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r RegisterUserResponse) GetJSON201() *User {
+	return r.JSON201
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r RegisterUserResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r RegisterUserResponse) GetJSON409() *ErrorResponse {
+	return r.JSON409
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r RegisterUserResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r RegisterUserResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RegisterUserResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RegisterUserResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RegisterUserResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
 }
 
 type GetHealthResponse struct {
@@ -965,6 +1752,8 @@ type ListTasksResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *[]Task
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
 }
@@ -972,6 +1761,11 @@ type ListTasksResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r ListTasksResponse) GetJSON200() *[]Task {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListTasksResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
 }
 
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
@@ -1015,6 +1809,8 @@ type CreateTaskResponse struct {
 	JSON201 *Task
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
 }
@@ -1027,6 +1823,11 @@ func (r CreateTaskResponse) GetJSON201() *Task {
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
 func (r CreateTaskResponse) GetJSON400() *ErrorResponse {
 	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r CreateTaskResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
 }
 
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
@@ -1066,10 +1867,17 @@ func (r CreateTaskResponse) ContentType() string {
 type DeleteTaskResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DeleteTaskResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
 }
 
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
@@ -1116,6 +1924,8 @@ type GetTaskResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *Task
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
@@ -1125,6 +1935,11 @@ type GetTaskResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetTaskResponse) GetJSON200() *Task {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetTaskResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
 }
 
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
@@ -1173,6 +1988,8 @@ type UpdateTaskResponse struct {
 	JSON200 *Task
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
@@ -1187,6 +2004,11 @@ func (r UpdateTaskResponse) GetJSON200() *Task {
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
 func (r UpdateTaskResponse) GetJSON400() *ErrorResponse {
 	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r UpdateTaskResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
 }
 
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
@@ -1267,6 +2089,126 @@ func (r GetVersionResponse) ContentType() string {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
 	return ""
+}
+
+// LoginUserWithBodyWithResponse Log in
+//
+// Returns an access token and a refresh token. The refresh token is also set as a Secure, HttpOnly cookie scoped to /auth.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /auth/login (the `LoginUser` operationId).
+func (c *ClientWithResponses) LoginUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LoginUserResponse, error) {
+	rsp, err := c.LoginUserWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLoginUserResponse(rsp)
+}
+
+// LoginUserWithResponse Log in
+//
+// Returns an access token and a refresh token. The refresh token is also set as a Secure, HttpOnly cookie scoped to /auth.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /auth/login (the `LoginUser` operationId).
+func (c *ClientWithResponses) LoginUserWithResponse(ctx context.Context, body LoginUserJSONRequestBody, reqEditors ...RequestEditorFn) (*LoginUserResponse, error) {
+	rsp, err := c.LoginUser(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLoginUserResponse(rsp)
+}
+
+// LogoutUserWithBodyWithResponse Log out
+//
+// Revokes the refresh token. The refresh token is read from the refresh_token cookie or from the request body. Always returns 204 when the token is missing or already invalid.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /auth/logout (the `LogoutUser` operationId).
+func (c *ClientWithResponses) LogoutUserWithBodyWithResponse(ctx context.Context, params *LogoutUserParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LogoutUserResponse, error) {
+	rsp, err := c.LogoutUserWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLogoutUserResponse(rsp)
+}
+
+// LogoutUserWithResponse Log out
+//
+// Revokes the refresh token. The refresh token is read from the refresh_token cookie or from the request body. Always returns 204 when the token is missing or already invalid.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /auth/logout (the `LogoutUser` operationId).
+func (c *ClientWithResponses) LogoutUserWithResponse(ctx context.Context, params *LogoutUserParams, body LogoutUserJSONRequestBody, reqEditors ...RequestEditorFn) (*LogoutUserResponse, error) {
+	rsp, err := c.LogoutUser(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLogoutUserResponse(rsp)
+}
+
+// RefreshSessionWithBodyWithResponse Refresh the session
+//
+// Exchanges a refresh token for a new token pair. The refresh token is read from the refresh_token cookie or from the request body.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /auth/refresh (the `RefreshSession` operationId).
+func (c *ClientWithResponses) RefreshSessionWithBodyWithResponse(ctx context.Context, params *RefreshSessionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RefreshSessionResponse, error) {
+	rsp, err := c.RefreshSessionWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRefreshSessionResponse(rsp)
+}
+
+// RefreshSessionWithResponse Refresh the session
+//
+// Exchanges a refresh token for a new token pair. The refresh token is read from the refresh_token cookie or from the request body.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /auth/refresh (the `RefreshSession` operationId).
+func (c *ClientWithResponses) RefreshSessionWithResponse(ctx context.Context, params *RefreshSessionParams, body RefreshSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*RefreshSessionResponse, error) {
+	rsp, err := c.RefreshSession(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRefreshSessionResponse(rsp)
+}
+
+// RegisterUserWithBodyWithResponse Register a user
+//
+// Creates a user with an email and password. Does not log the user in.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /auth/register (the `RegisterUser` operationId).
+func (c *ClientWithResponses) RegisterUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RegisterUserResponse, error) {
+	rsp, err := c.RegisterUserWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRegisterUserResponse(rsp)
+}
+
+// RegisterUserWithResponse Register a user
+//
+// Creates a user with an email and password. Does not log the user in.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /auth/register (the `RegisterUser` operationId).
+func (c *ClientWithResponses) RegisterUserWithResponse(ctx context.Context, body RegisterUserJSONRequestBody, reqEditors ...RequestEditorFn) (*RegisterUserResponse, error) {
+	rsp, err := c.RegisterUser(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRegisterUserResponse(rsp)
 }
 
 // GetHealthWithResponse Check service liveness
@@ -1418,6 +2360,201 @@ func (c *ClientWithResponses) GetVersionWithResponse(ctx context.Context, reqEdi
 	return ParseGetVersionResponse(rsp)
 }
 
+// ParseLoginUserResponse parses an HTTP response from a LoginUserWithResponse call
+func ParseLoginUserResponse(rsp *http.Response) (*LoginUserResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &LoginUserResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthTokens
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers LoginUserResponse200Headers
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseLogoutUserResponse parses an HTTP response from a LogoutUserWithResponse call
+func ParseLogoutUserResponse(rsp *http.Response) (*LogoutUserResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &LogoutUserResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		var headers LogoutUserResponse204Headers
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
+		}
+		response.Headers204 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRefreshSessionResponse parses an HTTP response from a RefreshSessionWithResponse call
+func ParseRefreshSessionResponse(rsp *http.Response) (*RefreshSessionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RefreshSessionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthTokens
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers RefreshSessionResponse200Headers
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRegisterUserResponse parses an HTTP response from a RegisterUserWithResponse call
+func ParseRegisterUserResponse(rsp *http.Response) (*RegisterUserResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RegisterUserResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest User
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetHealthResponse parses an HTTP response from a GetHealthWithResponse call
 func ParseGetHealthResponse(rsp *http.Response) (*GetHealthResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -1524,6 +2661,13 @@ func ParseListTasksResponse(rsp *http.Response) (*ListTasksResponse, error) {
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -1564,6 +2708,13 @@ func ParseCreateTaskResponse(rsp *http.Response) (*CreateTaskResponse, error) {
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -1592,6 +2743,13 @@ func ParseDeleteTaskResponse(rsp *http.Response) (*DeleteTaskResponse, error) {
 	switch {
 	case rsp.StatusCode == 204:
 		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest ErrorResponse
@@ -1632,6 +2790,13 @@ func ParseGetTaskResponse(rsp *http.Response) (*GetTaskResponse, error) {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest ErrorResponse
@@ -1680,6 +2845,13 @@ func ParseUpdateTaskResponse(rsp *http.Response) (*UpdateTaskResponse, error) {
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -1727,6 +2899,18 @@ func ParseGetVersionResponse(rsp *http.Response) (*GetVersionResponse, error) {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// LoginUser Log in
+	// (POST /auth/login)
+	LoginUser(w http.ResponseWriter, r *http.Request)
+	// LogoutUser Log out
+	// (POST /auth/logout)
+	LogoutUser(w http.ResponseWriter, r *http.Request, params LogoutUserParams)
+	// RefreshSession Refresh the session
+	// (POST /auth/refresh)
+	RefreshSession(w http.ResponseWriter, r *http.Request, params RefreshSessionParams)
+	// RegisterUser Register a user
+	// (POST /auth/register)
+	RegisterUser(w http.ResponseWriter, r *http.Request)
 	// GetHealth Check service liveness
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -1764,6 +2948,104 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// LoginUser operation middleware
+func (siw *ServerInterfaceWrapper) LoginUser(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.LoginUser(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// LogoutUser operation middleware
+func (siw *ServerInterfaceWrapper) LogoutUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params LogoutUserParams
+
+	{
+		var cookie *http.Cookie
+
+		if cookie, err = r.Cookie("refresh_token"); err == nil {
+			var value string
+			err = runtime.BindStyledParameterWithOptions("simple", "refresh_token", cookie.Value, &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationCookie, Explode: true, Required: false, Type: "string", Format: ""})
+			if err != nil {
+				siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "refresh_token", Err: err})
+				return
+			}
+			params.RefreshToken = &value
+
+		}
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.LogoutUser(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RefreshSession operation middleware
+func (siw *ServerInterfaceWrapper) RefreshSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RefreshSessionParams
+
+	{
+		var cookie *http.Cookie
+
+		if cookie, err = r.Cookie("refresh_token"); err == nil {
+			var value string
+			err = runtime.BindStyledParameterWithOptions("simple", "refresh_token", cookie.Value, &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationCookie, Explode: true, Required: false, Type: "string", Format: ""})
+			if err != nil {
+				siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "refresh_token", Err: err})
+				return
+			}
+			params.RefreshToken = &value
+
+		}
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RefreshSession(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RegisterUser operation middleware
+func (siw *ServerInterfaceWrapper) RegisterUser(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RegisterUser(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
@@ -2056,8 +3338,236 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/tasks/{id}", wrapper.DeleteTask)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tasks/{id}", wrapper.GetTask)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/tasks/{id}", wrapper.UpdateTask)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/register", wrapper.RegisterUser)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/login", wrapper.LoginUser)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/refresh", wrapper.RefreshSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/logout", wrapper.LogoutUser)
 
 	return m
+}
+
+type LoginUserRequestObject struct {
+	Body *LoginUserJSONRequestBody
+}
+
+type LoginUserResponseObject interface {
+	VisitLoginUserResponse(w http.ResponseWriter) error
+}
+
+type LoginUser200ResponseHeaders struct {
+	SetCookie *string
+}
+
+type LoginUser200JSONResponse struct {
+	Body    AuthTokens
+	Headers LoginUser200ResponseHeaders
+}
+
+func (response LoginUser200JSONResponse) VisitLoginUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LoginUser401JSONResponse ErrorResponse
+
+func (response LoginUser401JSONResponse) VisitLoginUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LoginUser500JSONResponse ErrorResponse
+
+func (response LoginUser500JSONResponse) VisitLoginUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LogoutUserRequestObject struct {
+	Params LogoutUserParams
+	Body   *LogoutUserJSONRequestBody
+}
+
+type LogoutUserResponseObject interface {
+	VisitLogoutUserResponse(w http.ResponseWriter) error
+}
+
+type LogoutUser204ResponseHeaders struct {
+	SetCookie *string
+}
+
+type LogoutUser204Response struct {
+	Headers LogoutUser204ResponseHeaders
+}
+
+func (response LogoutUser204Response) VisitLogoutUserResponse(w http.ResponseWriter) error {
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(204)
+	return nil
+}
+
+type LogoutUser500JSONResponse ErrorResponse
+
+func (response LogoutUser500JSONResponse) VisitLogoutUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RefreshSessionRequestObject struct {
+	Params RefreshSessionParams
+	Body   *RefreshSessionJSONRequestBody
+}
+
+type RefreshSessionResponseObject interface {
+	VisitRefreshSessionResponse(w http.ResponseWriter) error
+}
+
+type RefreshSession200ResponseHeaders struct {
+	SetCookie *string
+}
+
+type RefreshSession200JSONResponse struct {
+	Body    AuthTokens
+	Headers RefreshSession200ResponseHeaders
+}
+
+func (response RefreshSession200JSONResponse) VisitRefreshSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RefreshSession401JSONResponse ErrorResponse
+
+func (response RefreshSession401JSONResponse) VisitRefreshSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RefreshSession500JSONResponse ErrorResponse
+
+func (response RefreshSession500JSONResponse) VisitRefreshSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterUserRequestObject struct {
+	Body *RegisterUserJSONRequestBody
+}
+
+type RegisterUserResponseObject interface {
+	VisitRegisterUserResponse(w http.ResponseWriter) error
+}
+
+type RegisterUser201JSONResponse User
+
+func (response RegisterUser201JSONResponse) VisitRegisterUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterUser400JSONResponse ErrorResponse
+
+func (response RegisterUser400JSONResponse) VisitRegisterUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterUser409JSONResponse ErrorResponse
+
+func (response RegisterUser409JSONResponse) VisitRegisterUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterUser500JSONResponse ErrorResponse
+
+func (response RegisterUser500JSONResponse) VisitRegisterUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetHealthRequestObject struct {
@@ -2158,6 +3668,20 @@ func (response ListTasks200JSONResponse) VisitListTasksResponse(w http.ResponseW
 	return err
 }
 
+type ListTasks401JSONResponse ErrorResponse
+
+func (response ListTasks401JSONResponse) VisitListTasksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListTasks500JSONResponse ErrorResponse
 
 func (response ListTasks500JSONResponse) VisitListTasksResponse(w http.ResponseWriter) error {
@@ -2208,6 +3732,20 @@ func (response CreateTask400JSONResponse) VisitCreateTaskResponse(w http.Respons
 	return err
 }
 
+type CreateTask401JSONResponse ErrorResponse
+
+func (response CreateTask401JSONResponse) VisitCreateTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type CreateTask500JSONResponse ErrorResponse
 
 func (response CreateTask500JSONResponse) VisitCreateTaskResponse(w http.ResponseWriter) error {
@@ -2236,6 +3774,20 @@ type DeleteTask204Response struct {
 func (response DeleteTask204Response) VisitDeleteTaskResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
+}
+
+type DeleteTask401JSONResponse ErrorResponse
+
+func (response DeleteTask401JSONResponse) VisitDeleteTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type DeleteTask404JSONResponse ErrorResponse
@@ -2284,6 +3836,20 @@ func (response GetTask200JSONResponse) VisitGetTaskResponse(w http.ResponseWrite
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTask401JSONResponse ErrorResponse
+
+func (response GetTask401JSONResponse) VisitGetTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -2353,6 +3919,20 @@ func (response UpdateTask400JSONResponse) VisitUpdateTaskResponse(w http.Respons
 	return err
 }
 
+type UpdateTask401JSONResponse ErrorResponse
+
+func (response UpdateTask401JSONResponse) VisitUpdateTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type UpdateTask404JSONResponse ErrorResponse
 
 func (response UpdateTask404JSONResponse) VisitUpdateTaskResponse(w http.ResponseWriter) error {
@@ -2404,6 +3984,18 @@ func (response GetVersion200JSONResponse) VisitGetVersionResponse(w http.Respons
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// LoginUser Log in
+	// (POST /auth/login)
+	LoginUser(ctx context.Context, request LoginUserRequestObject) (LoginUserResponseObject, error)
+	// LogoutUser Log out
+	// (POST /auth/logout)
+	LogoutUser(ctx context.Context, request LogoutUserRequestObject) (LogoutUserResponseObject, error)
+	// RefreshSession Refresh the session
+	// (POST /auth/refresh)
+	RefreshSession(ctx context.Context, request RefreshSessionRequestObject) (RefreshSessionResponseObject, error)
+	// RegisterUser Register a user
+	// (POST /auth/register)
+	RegisterUser(ctx context.Context, request RegisterUserRequestObject) (RegisterUserResponseObject, error)
 	// GetHealth Check service liveness
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
@@ -2470,6 +4062,140 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// LoginUser operation middleware
+func (sh *strictHandler) LoginUser(w http.ResponseWriter, r *http.Request) {
+	var request LoginUserRequestObject
+
+	var body LoginUserJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.LoginUser(ctx, request.(LoginUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "LoginUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(LoginUserResponseObject); ok {
+		if err := validResponse.VisitLoginUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// LogoutUser operation middleware
+func (sh *strictHandler) LogoutUser(w http.ResponseWriter, r *http.Request, params LogoutUserParams) {
+	var request LogoutUserRequestObject
+
+	request.Params = params
+
+	var body LogoutUserJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.LogoutUser(ctx, request.(LogoutUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "LogoutUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(LogoutUserResponseObject); ok {
+		if err := validResponse.VisitLogoutUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RefreshSession operation middleware
+func (sh *strictHandler) RefreshSession(w http.ResponseWriter, r *http.Request, params RefreshSessionParams) {
+	var request RefreshSessionRequestObject
+
+	request.Params = params
+
+	var body RefreshSessionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RefreshSession(ctx, request.(RefreshSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RefreshSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RefreshSessionResponseObject); ok {
+		if err := validResponse.VisitRefreshSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RegisterUser operation middleware
+func (sh *strictHandler) RegisterUser(w http.ResponseWriter, r *http.Request) {
+	var request RegisterUserRequestObject
+
+	var body RegisterUserJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RegisterUser(ctx, request.(RegisterUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RegisterUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RegisterUserResponseObject); ok {
+		if err := validResponse.VisitRegisterUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // GetHealth operation middleware
@@ -2713,28 +4439,44 @@ func (sh *strictHandler) GetVersion(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"7FhBb9s4E/0rBL/vqNpO2wUK3brpbhtsdxGk6fawyGEsji22EqmSo6Ru4P++GFKyZEu2WzRNg0VvTkQO",
-	"37z3ZobSrcxsWVmDhrxMb6XPciwh/Dx1CISX4D9c4McaPfE/QSlN2hoozp2t0JFGL9MFFB4TqdBnTlf8",
-	"XKbyHFaFBSVqj0qQFVmIJ0AQ+A8TmciqF+FWkqYC+cd2FD5fhGcT8S7XhL6CDIX2gpwuS1RivhKUo/Do",
-	"rnWGHLiET6/RLCmX6cnjWSJpVaFMpSenzVKu14l0+LHWDpVM/2kOvtoss/P3mJFcJ/I356x7gQS6GAL7",
-	"E7JcG3zkEBTMCxTIq4U2C+tK4EXCIdXOdBCz2jk0JJ6fnw3zz6waSf8NhdhQVYXOYtR4Di+fyA3oNrdE",
-	"lug9LMdCwQJFXpdgdjE3WybyGFUBY3fEXs4u0FfW+BEQ4bFwzfOvYyiA5R//d7iQqfzftPPutDHutK/Z",
-	"LvwYYAz1K4SC8v2w30RziTysE56Aai/AqC4V0iV6grIaAo/Lh1FPm2y3oo6KysGH+99ennbHCiBxk+ss",
-	"D0RuYN2AF0s06IBQcexoT5lKBYSPQuBjsjf4Gxhj/HGVDvE9D6UuSjCwHC3U3QooqwIJ1TDSuxwpRxf2",
-	"h5g5eDFHNGKzqcfb3NoCwTCw2HTUc/oq9sIRzFyz/Ut5S6QeAf/W6I91E1QrNKQXGt0encebYNPqqGuG",
-	"R0XTSrbxkh61fUrGlHxbqW/q+r9rLJQXlAOJDIyYo8hyMKy/NQKMwE/akzbLzRgotelHPfkKW/yFN60B",
-	"uDOyT1EsbOeTcVPsYZmj0XcZNwOW/0bntTX7G07bGppjxHXcMCya5sFYyyrBkM7arcIudoEfNlAbeegS",
-	"Xslzbnjoq8vLc27eQYRQ963SbbesrAvq+62OOtl4NZUvrWjb7XkBxHXHIWXS5SpPJrPJjIm0FRqotEzl",
-	"k8ls8oTpAcoDM9MYmn8ucaT+L8Ls8QKEr7MMvV/URa9v5rrAPmGicpZXsRdcbYw2S0bNWoS5fKYYO1Ic",
-	"JTKRbagA5vFsFr1sCE2sqW6kT9/7qGAcYsdG3M6wCnKMjyvtBRT6GidBXF+XJbgVuyvH7MMmMV5h0IcG",
-	"D0vP2jfUXfG2hsfPe4n8o56jM0joH3la8W2l0OA3dRi3CzSqstrQAdI+/5dY4zvW6vNR9930Jlsbmvum",
-	"wwz1NQpysFjobJS1CwSlGwwPg7eQ9IQL85fZkzuDsH2nPIzAWNqgOKCe61E3Kl/oWT31tsl/rT1dhhXf",
-	"yLwmLP2x/Pkk2Y0RcA5WYzQERMI6hS4OqrMXjRaz+9PizBA6A0WgGl18xdgVg/mLY6HHf/z7ap3IyvoR",
-	"0rsXUhknFXr61arVneU2fONdbw9FcjWuB4qf3BmAKPS4sN1ddJ3Ip/er6DUUmod3IEXMrVoJbu692+iD",
-	"dNlp/4vDiNE2dT691Wode3SBhEPrvQj/b6xXgYMSCR0H+/LLvubHfDuRiTRQokzjHX3bXkmPod372dXA",
-	"ek/3fDCJebReeXp/uoTTuQcvbG3UA/VFVHO/L5Lxpv8S6eE5YHY/zaeT86eddu30EumQlyqgLB+6qXvR",
-	"/uGGuvtJOvyK8EWT9J7MXAd0P3CSRgDtQP1ZVqNlFT10eHr3vn7sa9nNp5bv+Yq0+zVnJOO933OGrWRn",
-	"SS9zv/KEJafOmwJ1Y/3itc2gEAqvsbBV2Z6KTiaydoVMZU5UpdNpwety6yl9Nns2k+ur9b8DAA==",
+	"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",
+	"n0Y/jbLF2eKPAQA=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

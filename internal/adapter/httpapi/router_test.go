@@ -40,9 +40,9 @@ func newTestRouter() http.Handler {
 	taskService := application.NewTaskService(repository)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	readiness := NewReadiness(fakeDatabasePinger{}, logger)
-	apiHandler := NewAPIHandler(taskService, readiness, logger)
+	apiHandler := NewAPIHandler(taskService, nil, readiness, logger)
 
-	return NewRouter(apiHandler, nil, fakeTokenVerifier{}, logger)
+	return NewRouter(apiHandler, fakeTokenVerifier{}, logger)
 }
 
 func TestVersionRoute(t *testing.T) {
@@ -179,8 +179,8 @@ func TestReadinessRoute(t *testing.T) {
 			taskService := application.NewTaskService(repository)
 			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 			readiness := NewReadiness(fakeDatabasePinger{err: test.databaseErr}, logger)
-			apiHandler := NewAPIHandler(taskService, readiness, logger)
-			router := NewRouter(apiHandler, nil, fakeTokenVerifier{}, logger)
+			apiHandler := NewAPIHandler(taskService, nil, readiness, logger)
+			router := NewRouter(apiHandler, fakeTokenVerifier{}, logger)
 
 			req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 			rec := httptest.NewRecorder()
@@ -204,8 +204,8 @@ func TestReadinessRouteDuringShutdown(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	readiness := NewReadiness(fakeDatabasePinger{}, logger)
 	readiness.BeginDraining()
-	apiHandler := NewAPIHandler(taskService, readiness, logger)
-	router := NewRouter(apiHandler, nil, fakeTokenVerifier{}, logger)
+	apiHandler := NewAPIHandler(taskService, nil, readiness, logger)
+	router := NewRouter(apiHandler, fakeTokenVerifier{}, logger)
 
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()

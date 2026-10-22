@@ -39,7 +39,7 @@ The project is organized by module (`task`, `auth`) with layers inside each modu
 - `internal/task/infrastructure/postgres`: PostgreSQL task repository. `memory` is kept for unit tests.
 - `internal/auth/domain`, `internal/auth/application`: users, credentials, sessions, login, registration, refresh, and logout.
 - `internal/auth/infrastructure/{argon2,postgres,token}`: password hashing, PostgreSQL repositories, and Ed25519 JWT and refresh-token handling.
-- `internal/auth/authentication.go`: wires the auth module and returns its HTTP handler and token verifier.
+- `internal/auth/authentication.go`: wires the auth module and returns its use cases and token verifier. The HTTP routes for auth are generated from `api/openapi.yaml` and implemented in `internal/adapter/httpapi/openapi_auth.go`.
 
 Use `README.md` for the current project structure, configuration variables, and commands.
 

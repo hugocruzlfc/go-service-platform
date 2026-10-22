@@ -341,8 +341,8 @@ func TestTaskRoutesHideRepositoryErrors(t *testing.T) {
 	taskService := application.NewTaskService(failingTaskRepository{err: repositoryError})
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	readiness := NewReadiness(fakeDatabasePinger{}, logger)
-	apiHandler := NewAPIHandler(taskService, readiness, logger)
-	router := NewRouter(apiHandler, nil, fakeTokenVerifier{}, logger)
+	apiHandler := NewAPIHandler(taskService, nil, readiness, logger)
+	router := NewRouter(apiHandler, fakeTokenVerifier{}, logger)
 
 	t.Run("create", func(t *testing.T) {
 		req := newTaskRequest(

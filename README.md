@@ -328,7 +328,12 @@ Refresh returns `200` with a new token pair. Logout returns `204`.
 
 Every `/tasks` request needs the `accessToken` from login. Replace
 `<access-token>` with that value and send it in the `Authorization` header.
-Requests without a valid token return `401`. The access token expires after
+Requests without a valid token return `401`.
+
+To try the task endpoints in Swagger UI (`http://localhost:8080/docs`), run
+`POST /auth/login` with "Try it out", copy the `accessToken` from the response,
+and click **Authorize**. Paste the token there without the `Bearer` prefix.
+Swagger adds it to the `Authorization` header of every protected request. The access token expires after
 `AUTH_ACCESS_TOKEN_TTL` (15 minutes by default), so log in again or refresh it
 when that happens.
 

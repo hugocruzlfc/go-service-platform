@@ -6,28 +6,25 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"log/slog"
-	"net/http"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"service-platform/internal/adapter/httpapi"
 	"service-platform/internal/auth/application"
 	"service-platform/internal/auth/infrastructure/argon2"
 	"service-platform/internal/auth/infrastructure/postgres"
 	"service-platform/internal/auth/infrastructure/token"
 )
 
-// NewHTTPHandler creates the complete authentication module and its HTTP handler.
-func NewHTTPHandler(
+// NewModule creates the authentication module. It returns the use cases used by
+// the HTTP API and the token service used to verify access tokens.
+func NewModule(
 	databasePool *pgxpool.Pool,
 	encodedJWTPrivateKey string,
 	jwtIssuer string,
 	jwtAudience string,
 	accessTokenTTL time.Duration,
-	logger *slog.Logger,
-) (http.Handler, application.TokenService, error) {
+) (application.AuthenticationUseCase, application.TokenService, error) {
 	jwtPrivateKey, err := decodeJWTPrivateKey(encodedJWTPrivateKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("load JWT private key: %w", err)
@@ -73,7 +70,7 @@ func NewHTTPHandler(
 		sessionService,
 	)
 
-	return httpapi.NewAuthHandler(authenticationService, logger), accessTokenService, nil
+	return authenticationService, accessTokenService, nil
 }
 
 func decodeJWTPrivateKey(encodedKey string) (ed25519.PrivateKey, error) {

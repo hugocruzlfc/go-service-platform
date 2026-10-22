@@ -13,6 +13,8 @@ import (
 
 	"service-platform/internal/auth/application"
 	"service-platform/internal/auth/domain"
+	taskapplication "service-platform/internal/task/application"
+	"service-platform/internal/task/infrastructure/memory"
 )
 
 type fakeAuthenticationService struct {
@@ -43,11 +45,15 @@ func (s *fakeAuthenticationService) Logout(_ context.Context, refreshToken strin
 	return s.logoutErr
 }
 
+// newAuthTestHandler builds the real API handler, so the tests exercise the
+// OpenAPI routes, body validation, and cookies end to end, with a fake use case.
 func newAuthTestHandler(
 	authenticationService application.AuthenticationUseCase,
 ) http.Handler {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	return NewAuthHandler(authenticationService, logger)
+	taskService := taskapplication.NewTaskService(memory.NewTaskRepository())
+	readiness := NewReadiness(fakeDatabasePinger{}, logger)
+	return NewAPIHandler(taskService, authenticationService, readiness, logger)
 }
 
 func TestAuthHandlerRegisterReturnsCreatedUser(t *testing.T) {

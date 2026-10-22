@@ -10,7 +10,6 @@ import (
 // authentication routes stay public.
 func NewRouter(
 	apiHandler http.Handler,
-	authenticationHandler http.Handler,
 	tokenVerifier AccessTokenVerifier,
 	logger *slog.Logger,
 ) http.Handler {
@@ -21,10 +20,6 @@ func NewRouter(
 		mux.Handle("/tasks", protected)
 		mux.Handle("/tasks/", protected)
 	}
-	if authenticationHandler != nil {
-		mux.Handle("/auth/", authenticationHandler)
-	}
-
 	mux.Handle("GET /openapi.json", openAPIHandler(logger))
 	mux.Handle("GET /docs", swaggerUIHandler())
 	return mux

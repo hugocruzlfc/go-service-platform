@@ -52,19 +52,19 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	defer databasePool.Close()
 
 	readiness := httpapi.NewReadiness(databasePool, logger)
-	taskHTTPHandler := task.NewHTTPHandler(databasePool, readiness, logger)
-	authenticationHTTPHandler, accessTokenVerifier, err := auth.NewHTTPHandler(
+	taskService := task.NewService(databasePool)
+	authenticationService, accessTokenVerifier, err := auth.NewModule(
 		databasePool,
 		cfg.AuthJWTPrivateKeyBase64,
 		cfg.AuthJWTIssuer,
 		cfg.AuthJWTAudience,
 		cfg.AuthAccessTokenTTL,
-		logger,
 	)
 	if err != nil {
 		return fmt.Errorf("configure authentication: %w", err)
 	}
-	router := httpapi.NewRouter(taskHTTPHandler, authenticationHTTPHandler, accessTokenVerifier, logger)
+	apiHandler := httpapi.NewAPIHandler(taskService, authenticationService, readiness, logger)
+	router := httpapi.NewRouter(apiHandler, accessTokenVerifier, logger)
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
