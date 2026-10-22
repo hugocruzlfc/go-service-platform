@@ -46,8 +46,10 @@ func (loginPasswordHasher) Hash(string) (string, error) { return "", nil }
 func (h loginPasswordHasher) Compare(string, string) error { return h.compareErr }
 
 type fakeSessionRepository struct {
-	session domain.Session
-	err     error
+	session   domain.Session
+	err       error
+	rotateErr error
+	revokedAt time.Time
 }
 
 func (r *fakeSessionRepository) Create(_ context.Context, session domain.Session) error {
@@ -61,11 +63,22 @@ func (r *fakeSessionRepository) GetByID(context.Context, string) (domain.Session
 	return r.session, nil
 }
 
-func (*fakeSessionRepository) Rotate(context.Context, string, string, domain.Session) error {
-	return nil
+func (r *fakeSessionRepository) Rotate(
+	_ context.Context,
+	_ string,
+	_ string,
+	rotatedSession domain.Session,
+) error {
+	if r.rotateErr == nil {
+		r.session = rotatedSession
+	}
+	return r.rotateErr
 }
 
-func (*fakeSessionRepository) Revoke(context.Context, string, time.Time) error { return nil }
+func (r *fakeSessionRepository) Revoke(_ context.Context, _ string, revokedAt time.Time) error {
+	r.revokedAt = revokedAt
+	return nil
+}
 
 func (*fakeSessionRepository) RevokeFamily(context.Context, string, time.Time) error { return nil }
 
@@ -76,7 +89,7 @@ func (fakeRefreshTokenManager) Issue(sessionID string) (string, string, error) {
 }
 
 func (fakeRefreshTokenManager) Parse(string) (string, string, error) {
-	return "", "", nil
+	return "", "", domain.ErrRefreshTokenInvalid
 }
 
 type fakeAccessTokenService struct {
