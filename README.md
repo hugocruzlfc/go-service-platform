@@ -7,6 +7,58 @@ Backend service platform built incrementally with Go.
 - Go 1.27.2
 - Docker with Docker Compose
 
+## Project structure
+
+```text
+cmd/
+  api/                 Entry point of the HTTP API; wires dependencies and loads .env
+  migrate/             Entry point that applies pending database migrations
+internal/
+  adapter/httpapi/     HTTP router, handlers, and Swagger UI/OpenAPI endpoints
+  api/                 Code generated from api/openapi.yaml (do not edit)
+  auth/                Authentication: domain, application, and infrastructure
+                       (argon2 password hashing, PostgreSQL, JWT tokens)
+  config/              Loads configuration from environment variables
+  migration/           Migration runner and the embedded SQL files in sql/
+  task/                Task module: domain, application, and infrastructure
+                       (in-memory and PostgreSQL repositories)
+api/openapi.yaml       OpenAPI contract, source of truth for the generated code
+```
+
+Each module follows the same layers. `domain` holds the entities and rules,
+`application` holds the use cases and the interfaces they need, and
+`infrastructure` implements those interfaces with concrete technology.
+
+## Configuration
+
+The API reads its configuration from environment variables. For local
+development, put them in a `.env` file in the project root. `cmd/api` loads
+that file automatically at startup. Variables already set in the shell take
+precedence over the file. The file is ignored by git and must not be committed.
+
+Required for the API:
+
+```bash
+echo "AUTH_JWT_PRIVATE_KEY_BASE64=$(openssl genpkey -algorithm ed25519 -outform DER | tail -c 32 | base64)" > .env
+```
+
+The command above overwrites `.env`. To add more variables later, edit the file
+instead of running it again.
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `AUTH_JWT_PRIVATE_KEY_BASE64` | Yes, for `cmd/api` | none | Ed25519 key in base64: a 32-byte seed or a 64-byte private key. Used to sign access tokens. |
+| `AUTH_JWT_ISSUER` | No | `service-platform` | Value of the `iss` claim in access tokens. |
+| `AUTH_JWT_AUDIENCE` | No | `service-platform-api` | Value of the `aud` claim in access tokens. |
+| `AUTH_ACCESS_TOKEN_TTL` | No | `15m` | Access token lifetime as a positive Go duration, for example `10m`. |
+| `DATABASE_URL` | No | local Docker Compose database | PostgreSQL URL. Must use the `postgres` or `postgresql` scheme. |
+| `PORT` | No | `8080` | HTTP port the API listens on. |
+| `TEST_DATABASE_URL` | Only for integration tests | none | PostgreSQL URL used by the `-tags=integration` tests. |
+
+`cmd/migrate` does not read `.env`. It uses `DATABASE_URL` from the shell, or
+the local default when it is not set. With the Docker Compose database running,
+the default is correct and you do not need to set it.
+
 ## Go module and dependency commands
 
 This project uses Go Modules. The module definition is stored in `go.mod`,
@@ -166,6 +218,9 @@ The migration command records applied versions in the `schema_migrations` table 
 
 ### 3. Start the API
 
+Make sure the `.env` file exists with `AUTH_JWT_PRIVATE_KEY_BASE64` set (see
+[Configuration](#configuration)). Without it the API stops at startup.
+
 The API connects to PostgreSQL and starts the HTTP server. It does not run database migrations:
 
 ```bash
@@ -210,6 +265,45 @@ the generated Go package.
 running and do not depend on PostgreSQL. `/readyz` is a readiness check: it
 returns `200` when PostgreSQL is reachable and `503` when the service should
 not receive traffic.
+
+### Authenticate
+
+Register a user, then log in to get an access token and a refresh token:
+
+```bash
+curl --fail --silent \
+  -X POST http://localhost:8080/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"ana@example.com","password":"correct-horse-battery-staple"}'
+
+curl --fail --silent \
+  -X POST http://localhost:8080/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"ana@example.com","password":"correct-horse-battery-staple"}'
+```
+
+Registration returns `201` with the created user. Login returns `200` with
+`accessToken`, `refreshToken`, and `expiresAt`. The refresh token is also set
+as an `HttpOnly` cookie scoped to `/auth`.
+
+The cookie is marked `Secure`, so clients on plain `http://localhost` do not
+send it back. The examples below send the refresh token in the JSON body
+instead. Replace `<refresh-token>` with the value returned by login:
+
+```bash
+curl --fail --silent \
+  -X POST http://localhost:8080/auth/refresh \
+  -H 'Content-Type: application/json' \
+  -d '{"refreshToken":"<refresh-token>"}'
+
+curl --fail --silent --include \
+  -X POST http://localhost:8080/auth/logout \
+  -H 'Content-Type: application/json' \
+  -d '{"refreshToken":"<refresh-token>"}'
+```
+
+Refresh returns `200` with a new token pair. Logout returns `204`. The task
+endpoints below do not require the access token yet.
 
 Create a task:
 
