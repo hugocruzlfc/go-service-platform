@@ -12,6 +12,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
+
 	"service-platform/internal/adapter/httpapi"
 	"service-platform/internal/auth"
 	"service-platform/internal/config"
@@ -29,6 +31,12 @@ func main() {
 }
 
 func run(ctx context.Context, logger *slog.Logger) error {
+	// Local development only: a missing .env file is fine (production sets real env vars).
+	// Variables already set in the shell take precedence over the file.
+	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("load .env: %w", err)
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
